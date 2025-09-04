@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>paperbot — Candlestick Report</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    img { width: 100%; height: auto; border-radius: 4px; }
+    .meta { color: #555; font-size: 0.9em; margin-bottom: 8px; }
+  </style>
+  </head>
+<body>
+  <h1>paperbot — Candlestick Report</h1>
+  <p class="meta">Generated at: {{ generated_at }}</p>
+  <div class="grid">
+  {% for e in entries %}
+    <div class="card">
+      <div class="meta">{{ e.symbol }} — {{ e.timeframe }} · bars: {{ e.bars }}</div>
+      <img src="{{ e.image }}" alt="{{ e.symbol }} chart" />
+    </div>
+  {% endfor %}
+  </div>
+</body>
+</html>
+

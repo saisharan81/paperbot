@@ -1,0 +1,9 @@
+global:
+  # How frequently Prometheus scrapes targets
+  scrape_interval: 15s
+
+scrape_configs:
+  # Scrape the bot container's Prometheus HTTP endpoint
+  - job_name: 'paperbot'
+    static_configs:
+      - targets: ['bot:8000']

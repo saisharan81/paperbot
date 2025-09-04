@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "paperbot"
+version = "0.1.0"
+description = "Algorithmic trading research bot"
+authors = ["Your Name <your@email.com>"]
+packages = [{ include = "paperbot", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ccxt = "*"
+pandas = "*"
+numpy = "*"
+pyarrow = "*"
+ta = "*"
+pandas-ta = "*"
+pydantic = "*"
+prometheus_client = "*"
+jinja2 = "*"
+matplotlib = "*"
+duckdb = "*"
+python-dotenv = "*"
+pyyaml = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-mock = "*"
+black = "*"
+ruff = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# Optional: configure Ruff to target src/ and basic rules (can be extended later)
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src"]
