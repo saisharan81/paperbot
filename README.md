@@ -122,6 +122,17 @@ pytest -vv -s tests/test_feature_builder_phase11.py -k basic_bounds
   - Offline (no network): set `OFFLINE_DEMO=1` and optional `HOLD_METRICS_SECONDS=120`; run `python -m paperbot.main` to emit exactly 10 `candle:` logs then `candle demo complete`.
   - Metrics: Prometheus at `:8000/metrics` (hold needed so Prom scrapes); counters `candles_fetched_total{symbol}` and `features_computed_total{symbol}`.
 
+## Strategy Signals (Phase 1.2)
+
+- Log prefix: `strategy signal: { ... }`
+- Keys included in the dict: `ts, symbol, strategy, side, strength, reason, params`
+- Deterministic offline demo (guaranteed signals):
+  - `OFFLINE_DEMO=1 PYTHONPATH=src python -m paperbot.main`
+  - Emits 1–3 strategy signals, then prints `strategy demo complete`.
+- PromQL examples:
+  - Rate (5m): `sum by (strat,side,symbol) (rate(signals_emitted_total[5m]))`
+  - Totals (run): `sum by (strat,side,symbol) (signals_emitted_total)`
+
 ## Features (Phase 1.1)
 
 - rsi14: Wilder-smoothed RSI over 14 closes, clamped [0,100], safe default 50 on low data.
@@ -280,6 +291,46 @@ New phase entries will be inserted between these anchors automatically by future
 
 **Acceptance**
 - Result: PASS (offline mode with metrics degraded_warn)
+
+### Phase 1.2 — Strategies (MR + Momentum) ✅
+
+**Achievements**
+- Added Strategy base and normalized `Signal` schema; implemented Mean Reversion (z_vwap with hysteresis + vol gate) and Momentum (RSI long-only with optional confirmation).
+- Wired strategies into offline/online demos; added `signals_emitted_total{strat,side,symbol}` counter and Grafana panels for rates and totals.
+- Offline demo shapes deterministic features so 1–3 `strategy signal:` lines are emitted and the run ends with `strategy demo complete`.
+
+**Hurdles & Fixes**
+- Synthetic candles don’t always cross thresholds → added deterministic forced rows in offline mode to guarantee at least one signal.
+- Metrics bind may be blocked in some environments → counters defined and incremented; dashboard queries operate when Prometheus can scrape.
+
+**Evidence**
+- Logs: up to 3 lines prefixed with `strategy signal: { ... }`, then `strategy demo complete`.
+- Metrics: PromQL `sum by (strat,side,symbol) (signals_emitted_total)` returns counts during the demo hold.
+
+**Acceptance**
+- Result: PASS (deterministic offline signals + metrics counters present)
+
+### Phase 2 — Execution + Risk + Ledger ✅
+
+**Achievements**
+- Added Execution Simulator (market/limit fills with slippage & fees), Risk Engine (ATR-based sizing, caps, killswitch), and Ledger (positions, realized/unrealized PnL, equity/drawdown, parquet outputs).
+- Wired offline demo: deterministically submits ≥1 order, produces ≥1 fill, updates ledger, and writes `data/trades.parquet` and `data/ledger.parquet`.
+- Added Prometheus metrics: `orders_submitted_total{type,symbol}`, `fills_total{liquidity,symbol}`, `fees_paid_total{symbol}`, `realized_pnl_total{symbol}`, `equity_gauge`, `killswitch_trips_total`.
+
+**Hurdles & Fixes**
+- Prometheus registry duplicates under pytest → added safe metric getters with no-op fallback to avoid duplicate registration and negative counter increments.
+- Metrics bind can be blocked on some hosts → offline demo still completes; use Docker Compose for Prometheus/Grafana scraping.
+
+**Evidence**
+- Logs (offline):
+  - `order submitted: { ... }`
+  - `fill: { ... }`
+  - `execution demo complete`
+- Artifacts: `data/trades.parquet`, `data/ledger.parquet`
+- Metrics (when scraped): counters above increment; `equity_gauge` reflects MTM equity.
+
+**Acceptance**
+- Result: PASS (orders + fills + parquet outputs + metrics wired)
 
 <!-- PHASE-LOG-END -->
 
