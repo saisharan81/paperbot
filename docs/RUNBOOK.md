@@ -70,6 +70,11 @@ Turn strategy signals into paper orders and simulated fills, track PnL and equit
 - [ ] Parquet files exist under `data/`
 - [ ] Metrics counters increment (when scraped)
 
+## Decision Log workflow
+- Author ADRs under `docs/decisions/` using `ADR-0000-template.md`.
+- One ADR per significant decision (schema, metrics, risk rules, branching).
+- Update the Decision Log index (`docs/decisions/README.md`) in the same PR.
+
 ## Troubleshooting
 - Metrics port bind fails: run via Docker Compose (Prometheus scrapes internal bot:8000) or set `HOLD_METRICS_SECONDS` and curl quickly.
 - No orders/fills online: signals depend on live data and thresholds; extend run duration or use offline deterministic mode.

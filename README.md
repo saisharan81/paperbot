@@ -31,9 +31,15 @@ src/paperbot/
 ├── reports/      # EOD HTML/CSV (future)
 └── config/       # config loader & typed settings
 
+  llm/            # provider-agnostic client (future)
+  prompts/        # decision prompts (bounded JSON)
+
 config/           # YAML config + Prometheus/Grafana provisioning
 tests/            # unit tests
 ```
+
+## Decision Log
+- See `docs/decisions/README.md` for ADRs (Architecture Decision Records), including signal schema, risk guardrails, metrics naming, offline determinism, and branching/release workflow.
 
 ## Current Status
 

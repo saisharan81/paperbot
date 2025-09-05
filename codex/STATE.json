@@ -11,8 +11,11 @@
   },
   "kpis": {
     "tests": "passed",
-    "last_summary": "37 passed; Phase 2 exec/risk/ledger: offline demo produced order+fill, parquet written; metrics wired; network bind may be restricted"
+    "last_summary": "37 passed; Phase 2 exec/risk/ledger + Phase 2.1 cleanup; offline demo produced order+fill, parquet written; metrics wired; update Decision Log each phase"
   },
+  "reminders": [
+    "Update the Decision Log (ADRs) after each phase"
+  ],
   "next_task": "PHASE_2.2_EXEC_REFINEMENTS",
   "backlog": [
     {"id":"PHASE_1_2_STRATEGIES", "title":"Strategy base + MR + Momentum with tests"},
