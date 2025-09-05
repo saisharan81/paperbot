@@ -41,6 +41,9 @@ tests/            # unit tests
 ## Decision Log
 - See `docs/decisions/README.md` for ADRs (Architecture Decision Records), including signal schema, risk guardrails, metrics naming, offline determinism, and branching/release workflow.
 
+## PRs
+- Phase PR drafts live in `docs/pr/`. Once ready, open a PR from the phase branch to `main`.
+
 ## Current Status
 
 - Phase 0 — Bootstrap & Candle Fetch Demo: PASS
