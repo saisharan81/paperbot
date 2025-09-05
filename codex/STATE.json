@@ -1,17 +1,22 @@
 {
   "version": 1,
-  "updated_at_utc": "2025-09-05T01:13:31Z",
+  "updated_at_utc": "2025-09-05T04:43:16Z",
   "phases": {
     "phase0": "pass",
     "phase1_1": "pass",
     "phase1_1_1": "pass",
-    "metrics": "degraded_warn"
+    "metrics": "degraded_warn",
+    "phase1_2": "pass",
+    "phase2_1": "pass"
   },
   "kpis": {
     "tests": "passed",
-    "last_summary": "25 passed; baseline + expansion features implemented; metrics disabled; network blocked in sandbox"
+    "last_summary": "37 passed; Phase 2 exec/risk/ledger + Phase 2.1 cleanup; offline demo produced order+fill, parquet written; metrics wired; update Decision Log each phase"
   },
-  "next_task": "PHASE_1_2_STRATEGIES",
+  "reminders": [
+    "Update the Decision Log (ADRs) after each phase"
+  ],
+  "next_task": "PHASE_2.2_EXEC_REFINEMENTS",
   "backlog": [
     {"id":"PHASE_1_2_STRATEGIES", "title":"Strategy base + MR + Momentum with tests"},
     {"id":"PHASE_2_EXEC_RISK", "title":"Execution simulator + Risk engine + limits + kill-switch"},
