@@ -70,3 +70,6 @@ coverage.xml
 
 # Mac
 .DS_Store
+
+# Virtualenv
+.venv/
