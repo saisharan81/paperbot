@@ -22,3 +22,31 @@ features:
 
 # env prefix = f"{exchange.upper()}_{environment.replace('-', '_').upper()}"
 # Example: BINANCE_SPOT_TESTNET_API_KEY, BINANCE_SPOT_TESTNET_API_SECRET
+
+strategies:
+  mr:
+    enabled: true
+    enter_long_if_below: -1.5
+    exit_long_if_above: -0.3
+    enter_short_if_above: 1.5
+    exit_short_if_below: 0.3
+    vol_gate_rv_30m_max: 0.03
+  momentum:
+    enabled: true
+    enter_long_if_rsi_at_least: 60
+    exit_long_if_rsi_at_most: 50
+    confirm_bars: 0
+
+execution:
+  slippage_bps_market: 3
+  taker_bps: 1
+  maker_bps: 0.5
+  liquidity_fraction: 0.15
+
+risk:
+  risk_frac: 0.0025
+  atr_stop_mult: 1.5
+  atr_tp_mult: 1.0
+  daily_loss_cap_pct: 0.01
+  max_positions: 3
+  max_position_value_per_symbol: 0.2

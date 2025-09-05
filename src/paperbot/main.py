@@ -48,6 +48,8 @@ def main() -> None:
     # Define metrics
     CANDLES_FETCHED = Counter("candles_fetched_total", "Candles fetched", ["symbol"]) 
     FEATURES_COMPUTED = Counter("features_computed_total", "Features computed", ["symbol"]) 
+    SIGNALS_EMITTED = Counter("signals_emitted_total", "Signals emitted", ["strat", "side", "symbol"]) 
+    SIGNALS_SUPPRESSED = Counter("signals_suppressed_total", "Signals suppressed", ["strat", "reason"]) 
 
     # Feature computation pipeline (fetcher is created later if needed)
     feature_builder = FeatureBuilder(config)
@@ -65,6 +67,26 @@ def main() -> None:
         now_ms = int(time.time() * 1000)
         timeframe_ms = 60_000  # assumes 1m timeframe for demo
 
+        # Prepare strategies
+        strategies_cfg = config.get("strategies", {})
+        enabled_strategies = []
+        try:
+            from paperbot.strategies.mr import MeanReversionStrategy
+            from paperbot.strategies.momentum import MomentumStrategy
+            from paperbot.strategies.runner import StrategyRunner
+        except Exception as e:
+            logging.warning(f"Failed to import strategies: {e}")
+            strategies_cfg = {}
+
+        if strategies_cfg:
+            if strategies_cfg.get("mr", {}).get("enabled", False):
+                enabled_strategies.append(MeanReversionStrategy(strategies_cfg.get("mr", {})))
+            if strategies_cfg.get("momentum", {}).get("enabled", False):
+                enabled_strategies.append(MomentumStrategy(strategies_cfg.get("momentum", {})))
+        runner = StrategyRunner(enabled_strategies, signals_counter=SIGNALS_EMITTED, suppressed_counter=SIGNALS_SUPPRESSED)
+
+        signals_remaining = 3
+        forced_done = False
         for symbol in settings.symbols:
             # create ~20 synthetic candles per symbol
             candles = []
@@ -115,7 +137,95 @@ def main() -> None:
             logging.info(f"{symbol} features: {features}")
             FEATURES_COMPUTED.labels(symbol).inc()
 
+            # Run strategies and log up to 10 signals across all symbols
+            if enabled_strategies and signals_remaining > 0:
+                signals = runner.on_feature_row(features)
+                for sig in signals:
+                    if signals_remaining <= 0:
+                        break
+                    logging.info(f"strategy signal: {sig.__dict__}")
+                    signals_remaining -= 1
+
+            # Deterministic forced signals (once) to demonstrate Phase 1.2
+            if enabled_strategies and not forced_done and signals_remaining > 0:
+                # Force MR enter (z<=-1.6) and Momentum enter (rsi>=60) on first row
+                forced1 = dict(features)
+                forced1["z_vwap"] = -1.7
+                forced1["rsi14"] = 62.0
+                forced1["rv_30m"] = 0.01
+                # Force MR exit (z>=-0.3); keep RSI still high to avoid momentum exit
+                forced2 = dict(features)
+                forced2["z_vwap"] = -0.2
+                forced2["rsi14"] = 61.0
+                forced2["rv_30m"] = 0.01
+                for row in (forced1, forced2):
+                    if signals_remaining <= 0:
+                        break
+                    s_list = runner.on_feature_row(row)
+                    for sig in s_list:
+                        if signals_remaining <= 0:
+                            break
+                        logging.info(f"strategy signal: {sig.__dict__}")
+                        signals_remaining -= 1
+                forced_done = True
+
+        # --- Phase 2: Execution demo (offline) ---
+        try:
+            from paperbot.exec.simulator import ExecutionSimulator
+            from paperbot.risk.engine import RiskEngine
+            from paperbot.ledger.ledger import Ledger
+        except Exception as e:
+            logging.warning(f"Failed to import execution modules: {e}")
+            logging.info("candle demo complete")
+            logging.info("strategy demo complete")
+            hold = int(os.getenv("HOLD_METRICS_SECONDS", "0"))
+            if hold > 0:
+                logging.info(f"holding metrics server for {hold}s before exit")
+                time.sleep(hold)
+            return
+
+        exec_cfg = config.get("execution", {})
+        risk_cfg = config.get("risk", {})
+        simulator = ExecutionSimulator(exec_cfg)
+        ledger = Ledger(equity_start=10_000.0)
+        risk_engine = RiskEngine(risk_cfg, equity_start=ledger.equity)
+
+        # Use the last synthetic candle per symbol for fills and the shaped rows for entries
+        for symbol in settings.symbols:
+            # Create a shaped feature row to force an entry for each symbol
+            forced = {
+                "timestamp": int(time.time() * 1000),
+                "symbol": symbol,
+                "price": 100.0,
+                "atr14": 1.0,
+            }
+            # Use Momentum long for demo simplicity
+            if enabled_strategies:
+                from paperbot.strategies.base import Signal
+                sig = Signal(ts=forced["timestamp"], symbol=symbol, strategy="momentum", side="long", strength=1.0, reason="demo", params={})
+                order = risk_engine.approve(sig, forced, ledger.equity)
+                if order:
+                    logging.info(f"order submitted: {order.__dict__}")
+                    # fabricate a candle for this symbol
+                    cndl = {
+                        "timestamp": forced["timestamp"],
+                        "open": 100.0,
+                        "high": 100.2,
+                        "low": 99.8,
+                        "close": 100.1,
+                        "volume": 100.0,
+                    }
+                    fills = simulator.submit(order, cndl)
+                    for f in fills:
+                        logging.info(f"fill: {f.__dict__}")
+                        ledger.on_fill(f)
+                    # MTM at close
+                    ledger.mark_to_market(forced["timestamp"], {symbol: cndl["close"]})
+        # Write outputs
+        ledger.write_parquet("data")
         logging.info("candle demo complete")
+        logging.info("strategy demo complete")
+        logging.info("execution demo complete")
         # Optional: keep the metrics server alive for inspection
         hold = int(os.getenv("HOLD_METRICS_SECONDS", "0"))
         if hold > 0:
@@ -126,6 +236,24 @@ def main() -> None:
     # Exchange client + feature computation pipeline for live/demo network mode
     from paperbot.data.candles import CandleFetcher
     fetcher = CandleFetcher(settings)
+    # Prepare strategies for online mode
+    strategies_cfg = config.get("strategies", {})
+    enabled_strategies = []
+    try:
+        from paperbot.strategies.mr import MeanReversionStrategy
+        from paperbot.strategies.momentum import MomentumStrategy
+        from paperbot.strategies.runner import StrategyRunner
+    except Exception as e:
+        logging.warning(f"Failed to import strategies: {e}")
+        strategies_cfg = {}
+
+    if strategies_cfg:
+        if strategies_cfg.get("mr", {}).get("enabled", False):
+            enabled_strategies.append(MeanReversionStrategy(strategies_cfg.get("mr", {})))
+        if strategies_cfg.get("momentum", {}).get("enabled", False):
+            enabled_strategies.append(MomentumStrategy(strategies_cfg.get("momentum", {})))
+    runner = StrategyRunner(enabled_strategies, signals_counter=SIGNALS_EMITTED, suppressed_counter=SIGNALS_SUPPRESSED)
+    signals_remaining = 10
     
     # Log exactly 10 normalized candles across all symbols, then compute features
     candle_logs_remaining = 10
@@ -183,8 +311,18 @@ def main() -> None:
         if expansion_config.get('hour_of_day', False):
             logging.info(f"{symbol} Hour: {features.get('hour_hour_int', 'N/A')} "
                         f"({features.get('hour_hour_cat', 'N/A')})")
+
+        # Run strategies and log up to 10 signals across all symbols
+        if enabled_strategies and signals_remaining > 0:
+            signals = runner.on_feature_row(features)
+            for sig in signals:
+                if signals_remaining <= 0:
+                    break
+                logging.info(f"strategy signal: {sig.__dict__}")
+                signals_remaining -= 1
     
     logging.info("candle demo complete")
+    logging.info("strategy demo complete")
     # Optional: keep the metrics server alive for inspection
     hold = int(os.getenv("HOLD_METRICS_SECONDS", "0"))
     if hold > 0:
