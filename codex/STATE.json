@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "updated_at_utc": "2025-09-05T01:13:31Z",
+  "phases": {
+    "phase0": "pass",
+    "phase1_1": "pass",
+    "phase1_1_1": "pass",
+    "metrics": "degraded_warn"
+  },
+  "kpis": {
+    "tests": "passed",
+    "last_summary": "25 passed; baseline + expansion features implemented; metrics disabled; network blocked in sandbox"
+  },
+  "next_task": "PHASE_1_2_STRATEGIES",
+  "backlog": [
+    {"id":"PHASE_1_2_STRATEGIES", "title":"Strategy base + MR + Momentum with tests"},
+    {"id":"PHASE_2_EXEC_RISK", "title":"Execution simulator + Risk engine + limits + kill-switch"},
+    {"id":"PHASE_3_OBS_REPORTS", "title":"Metrics dashboards + EOD reports"},
+    {"id":"PHASE_4_BACKTEST", "title":"Backtesting harness"}
+  ]
+}
