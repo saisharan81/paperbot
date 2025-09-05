@@ -186,7 +186,10 @@ def main() -> None:
 
         exec_cfg = config.get("execution", {})
         risk_cfg = config.get("risk", {})
-        simulator = ExecutionSimulator(exec_cfg)
+        # Load exchange execution profile
+        from paperbot.config.loader import load_exchange_profile
+        profile = load_exchange_profile(settings.exchange, settings.environment)
+        simulator = ExecutionSimulator(exec_cfg, profile=profile)
         ledger = Ledger(equity_start=10_000.0)
         risk_engine = RiskEngine(risk_cfg, equity_start=ledger.equity)
 
@@ -207,18 +210,16 @@ def main() -> None:
                 if order:
                     logging.info(f"order submitted: {order.__dict__}")
                     # fabricate a candle for this symbol
-                    cndl = {
-                        "timestamp": forced["timestamp"],
-                        "open": 100.0,
-                        "high": 100.2,
-                        "low": 99.8,
-                        "close": 100.1,
-                        "volume": 100.0,
-                    }
-                    fills = simulator.submit(order, cndl)
-                    for f in fills:
-                        logging.info(f"fill: {f.__dict__}")
-                        ledger.on_fill(f)
+                    candles = [
+                        {"timestamp": forced["timestamp"], "open": 100.0, "high": 100.2, "low": 99.8, "close": 100.1, "volume": 100.0},
+                        {"timestamp": forced["timestamp"] + 60_000, "open": 100.1, "high": 100.3, "low": 99.9, "close": 100.15, "volume": 100.0},
+                    ]
+                    # simulate partial fills across two bars
+                    for cndl in candles:
+                        fills = simulator.submit(order, cndl, features={"atr14": 1.0})
+                        for f in fills:
+                            logging.info(f"fill: {f.__dict__}")
+                            ledger.on_fill(f)
                     # MTM at close
                     ledger.mark_to_market(forced["timestamp"], {symbol: cndl["close"]})
         # Write outputs

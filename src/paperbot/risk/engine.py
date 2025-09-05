@@ -30,7 +30,7 @@ class RiskEngine:
 
     def approve(self, signal: Signal, features: Dict[str, Any], equity: float) -> Optional[Order]:
         if self.killswitch_on:
-            self.orders_blocked.labels("killswitch").inc()
+            self.orders_blocked.labels("killswitch", signal.symbol).inc()
             return None
 
         symbol = signal.symbol
@@ -42,7 +42,7 @@ class RiskEngine:
         # Manage max positions
         open_count = sum(1 for v in self.open_positions.values() if v)
         if side in ("long", "short") and open_count >= self.max_positions and not self.open_positions.get(symbol, False):
-            self.orders_blocked.labels("max_positions").inc()
+            self.orders_blocked.labels("max_positions", symbol).inc()
             return None
 
         # flat = exit if open
@@ -60,13 +60,13 @@ class RiskEngine:
         stop_dist = max(atr14 * self.atr_stop_mult, 1e-9)
         qty = (equity * self.risk_frac) / stop_dist
         if qty <= 0:
-            self.orders_blocked.labels("qty_zero").inc()
+            self.orders_blocked.labels("qty_zero", symbol).inc()
             return None
         # Enforce per-symbol notional cap
         if equity > 0:
             notional_frac = abs(qty * price) / equity if price > 0 else 1.0
             if notional_frac > self.max_position_value_per_symbol:
-                self.orders_blocked.labels("symbol_value_cap").inc()
+                self.orders_blocked.labels("symbol_value_cap", symbol).inc()
                 return None
 
         order_side = "buy" if side == "long" else "sell"
@@ -75,4 +75,3 @@ class RiskEngine:
             id=new_id(), ts=ts, symbol=symbol, side=order_side, type="market",
             qty=float(qty), price=None, strategy=signal.strategy, reason=signal.reason, params=signal.params,
         )
-

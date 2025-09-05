@@ -3,7 +3,7 @@ from src.paperbot.exec.simulator import ExecutionSimulator
 
 
 def test_market_fill_with_slippage_and_fee():
-    sim = ExecutionSimulator({"slippage_bps_market": 10, "taker_bps": 5})
+    sim = ExecutionSimulator({"slippage_bps_market": 10, "taker_bps": 5, "liquidity_fraction": 1.0}, profile={"tick_size": 0.000001, "step_size": 1.0})
     order = Order(id=new_id(), ts=1, symbol="BTC/USDT", side="buy", type="market", qty=1.0, price=None, strategy="t", reason="t", params={})
     candle = {"timestamp": 2, "close": 100.0}
     fills = sim.submit(order, candle)
@@ -24,4 +24,3 @@ def test_limit_fill_cross_maker_fee():
     f = fills[0]
     assert f.price == 99.0
     assert f.fee > 0
-

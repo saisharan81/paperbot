@@ -7,7 +7,8 @@
     "phase1_1_1": "pass",
     "metrics": "degraded_warn",
     "phase1_2": "pass",
-    "phase2_1": "pass"
+    "phase2_1": "pass",
+    "phase2_2": "pass"
   },
   "kpis": {
     "tests": "passed",
@@ -16,7 +17,7 @@
   "reminders": [
     "Update the Decision Log (ADRs) after each phase"
   ],
-  "next_task": "PHASE_2.2_EXEC_REFINEMENTS",
+  "next_task": "PHASE_3_0_LLM_DECISIONS",
   "backlog": [
     {"id":"PHASE_1_2_STRATEGIES", "title":"Strategy base + MR + Momentum with tests"},
     {"id":"PHASE_2_EXEC_RISK", "title":"Execution simulator + Risk engine + limits + kill-switch"},

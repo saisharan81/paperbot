@@ -361,6 +361,22 @@ New phase entries will be inserted between these anchors automatically by future
 **Result**
 - PASS
 
+### Phase 2.2 — Execution Refinements ✅
+
+**Achievements**
+- Simulator: partial fills per bar via `liquidity_fraction` (default 0.25), tracked by order_id across bars; rounding to `tick_size`/`step_size`; min_notional guard.
+- Exchange profiles: added under `config/exchanges/` (Binance Spot, Alpaca) with fees/tick/step/min_notional/slippage; auto-loaded based on `(exchange, environment)`.
+- Slippage models: `fixed_bps` (default) and `atr_scaled` (optional multiplier on ATR/price).
+- Metrics & Grafana: added panels for orders submitted rate, fills rate by liquidity, fees (1h increase), and equity gauge.
+
+**Evidence**
+- Tests: `PYTHONPATH=src pytest -q` → 42 passed.
+- Offline demo: shows ≥2 `fill: {…}` for same `order_id`; ends with `execution demo complete`.
+- Dashboard: panels render for orders/fills/fees/equity; signals panels unchanged.
+
+**Result**
+- PASS
+
 ---
 
 ## Contributing / Extending

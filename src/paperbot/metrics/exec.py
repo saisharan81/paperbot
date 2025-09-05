@@ -63,7 +63,7 @@ def get_orders_submitted_total():
 def get_orders_blocked_total():
     global _orders_blocked
     if _orders_blocked is None:
-        _orders_blocked = _safe_counter("orders_blocked_total", "Orders blocked", ["reason"])
+        _orders_blocked = _safe_counter("orders_blocked_total", "Orders blocked", ["reason", "symbol"])
     return _orders_blocked
 
 
@@ -91,6 +91,7 @@ def get_realized_pnl_total():
 def get_equity_gauge():
     global _equity_gauge
     if _equity_gauge is None:
+        # Labeled by symbol; use symbol="total" for account equity snapshots
         _equity_gauge = _safe_gauge("equity_gauge", "Equity value")
     return _equity_gauge
 

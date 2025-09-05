@@ -376,6 +376,46 @@
       ],
       "title": "Signals emitted total (by strat/side)",
       "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
+      "id": 8,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true } },
+      "targets": [ { "expr": "sum by (type,symbol) (rate(orders_submitted_total[5m]))", "refId": "A", "legendFormat": "{{type}} {{symbol}}" } ],
+      "title": "Orders submitted rate (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 42 },
+      "id": 9,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true } },
+      "targets": [ { "expr": "sum by (liquidity,symbol) (rate(fills_total[5m]))", "refId": "A", "legendFormat": "{{liquidity}} {{symbol}}" } ],
+      "title": "Fills rate by liquidity (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 50 },
+      "id": 10,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
+      "targets": [ { "expr": "sum by (symbol) (increase(fees_paid_total[1h]))", "refId": "A", "legendFormat": "{{symbol}}" } ],
+      "title": "Fees paid (1h increase)",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 50 },
+      "id": 11,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
+      "targets": [ { "expr": "equity_gauge{symbol=\"total\"}", "refId": "A", "legendFormat": "equity total" } ],
+      "title": "Equity (total)",
+      "type": "stat"
     }
   ],
   "preload": false,
