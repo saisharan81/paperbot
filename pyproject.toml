@@ -3,6 +3,10 @@ name = "paperbot"
 version = "0.1.0"
 description = "Algorithmic trading research bot"
 authors = ["Your Name <your@email.com>"]
+license = "Apache-2.0"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+]
 packages = [{ include = "paperbot", from = "src" }]
 
 [tool.poetry.dependencies]
