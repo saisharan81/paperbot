@@ -1,0 +1,54 @@
+{
+  "id": null,
+  "title": "Paperbot Overview",
+  "tags": ["paperbot"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Bot UP",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "up{job=\"paperbot\"}", "legendFormat": "UP" } ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "orientation": "horizontal" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Candles fetched rate (5m)",
+      "gridPos": { "h": 8, "w": 20, "x": 4, "y": 0 },
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (symbol) (rate(candles_fetched_total[5m]))", "legendFormat": "{{symbol}}" } ],
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Features computed rate (5m)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (symbol) (rate(features_computed_total[5m]))", "legendFormat": "{{symbol}}" } ],
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } }
+    },
+    {
+      "type": "stat",
+      "title": "Candles fetched total",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 16 },
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (symbol) (candles_fetched_total)", "legendFormat": "{{symbol}}" } ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } }
+    },
+    {
+      "type": "stat",
+      "title": "Features computed total",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 },
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (symbol) (features_computed_total)", "legendFormat": "{{symbol}}" } ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } }
+    }
+  ]
+}
+

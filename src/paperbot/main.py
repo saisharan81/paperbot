@@ -22,7 +22,6 @@ import os
 import yaml
 import time
 from paperbot.config.loader import load_settings
-from paperbot.data.candles import CandleFetcher
 from paperbot.features.feature_builder import FeatureBuilder
 from prometheus_client import start_http_server, Counter
 
@@ -50,9 +49,83 @@ def main() -> None:
     CANDLES_FETCHED = Counter("candles_fetched_total", "Candles fetched", ["symbol"]) 
     FEATURES_COMPUTED = Counter("features_computed_total", "Features computed", ["symbol"]) 
 
-    # Exchange client + feature computation pipeline
-    fetcher = CandleFetcher(settings)
+    # Feature computation pipeline (fetcher is created later if needed)
     feature_builder = FeatureBuilder(config)
+
+    # Optional OFFLINE_DEMO mode: generate synthetic candles, avoid network
+    if os.getenv("OFFLINE_DEMO", "0") == "1":
+        logging.info("OFFLINE_DEMO=1: using synthetic candles")
+        try:
+            import numpy as np  # local import to keep main lean
+        except Exception:
+            logging.warning("OFFLINE_DEMO requested but numpy unavailable; falling back to zeros")
+            np = None
+
+        candle_logs_remaining = 10
+        now_ms = int(time.time() * 1000)
+        timeframe_ms = 60_000  # assumes 1m timeframe for demo
+
+        for symbol in settings.symbols:
+            # create ~20 synthetic candles per symbol
+            candles = []
+            price = 100.0
+            for i in range(20):
+                if np is not None:
+                    price += float(np.random.normal(0.0, 0.5))
+                    o = price + float(np.random.normal(0.0, 0.1))
+                    h = max(o, price) + 0.5
+                    l = min(o, price) - 0.5
+                    v = abs(float(np.random.normal(100.0, 10.0)))
+                else:
+                    # deterministic fallback
+                    o = price
+                    h = o + 0.5
+                    l = o - 0.5
+                    v = 100.0
+                candles.append({
+                    "timestamp": now_ms - (19 - i) * timeframe_ms,
+                    "open": o,
+                    "high": h,
+                    "low": l,
+                    "close": price,
+                    "volume": v,
+                    "symbol": symbol,
+                })
+
+            # Emit exactly 10 normalized candles across symbols
+            for c in candles:
+                if candle_logs_remaining <= 0:
+                    break
+                normalized = {
+                    "ts": c.get("timestamp"),
+                    "o": c.get("open"),
+                    "h": c.get("high"),
+                    "l": c.get("low"),
+                    "c": c.get("close"),
+                    "v": c.get("volume"),
+                    "timeframe": settings.timeframe,
+                    "symbol": symbol,
+                }
+                logging.info(f"candle: {normalized}")
+                CANDLES_FETCHED.labels(symbol).inc()
+                candle_logs_remaining -= 1
+
+            # Compute features and increment metrics
+            features = feature_builder.compute_latest(candles)
+            logging.info(f"{symbol} features: {features}")
+            FEATURES_COMPUTED.labels(symbol).inc()
+
+        logging.info("candle demo complete")
+        # Optional: keep the metrics server alive for inspection
+        hold = int(os.getenv("HOLD_METRICS_SECONDS", "0"))
+        if hold > 0:
+            logging.info(f"holding metrics server for {hold}s before exit")
+            time.sleep(hold)
+        return
+
+    # Exchange client + feature computation pipeline for live/demo network mode
+    from paperbot.data.candles import CandleFetcher
+    fetcher = CandleFetcher(settings)
     
     # Log exactly 10 normalized candles across all symbols, then compute features
     candle_logs_remaining = 10

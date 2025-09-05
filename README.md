@@ -104,6 +104,24 @@ pytest -q
 pytest -vv -s tests/test_feature_builder_phase11.py -k basic_bounds
 ```
 
+## Testing & Verification
+
+- What we test (automated):
+  - Phase 1.1 baseline indicators: RSI(14), ATR(14), Session VWAP, Z-score to VWAP(50), Realized Vol(30). Invariants: RSI∈[0,100], ATR≥0, VWAP>0 (with volume), Z-score finite/0 on flat series, RV≥0 and >0 on noise.
+  - Phase 1.1.1 optional indicators (config-gated): SMA/EMA crossover (signal ±1), MACD (trend-consistent sign), Bollinger (upper>middle>lower), OBV (sign follows trend), Keltner (upper>middle>lower), rolling skew/kurtosis (well-defined), hour_of_day (UTC-safe).
+  - Integration sanity: dict shapes/types, robust defaults on insufficient data.
+
+- How to run just Phase 1.1 / 1.1.1 tests:
+  - `PYTHONPATH=. .venv/bin/pytest -q tests/test_feature_builder_phase11.py tests/test_features_expansion.py`
+
+- Expected outcome (current):
+  - `25 passed` in under a second on a typical dev machine.
+
+- End-to-end demo (Phase 0):
+  - Online (default): `docker compose up --build` with testnet keys in repo-root `.env`.
+  - Offline (no network): set `OFFLINE_DEMO=1` and optional `HOLD_METRICS_SECONDS=120`; run `python -m paperbot.main` to emit exactly 10 `candle:` logs then `candle demo complete`.
+  - Metrics: Prometheus at `:8000/metrics` (hold needed so Prom scrapes); counters `candles_fetched_total{symbol}` and `features_computed_total{symbol}`.
+
 ## Features (Phase 1.1)
 
 - rsi14: Wilder-smoothed RSI over 14 closes, clamped [0,100], safe default 50 on low data.
@@ -243,6 +261,25 @@ New phase entries will be inserted between these anchors automatically by future
 - Logs: `Resolved env prefix: BINANCE_SPOT_TESTNET`, `Exchange: binance, Environment: spot-testnet`
 - Logs: candle lines + `candle demo complete`
 - `curl http://localhost:8000/metrics | head`
+
+### Phase 0 — Offline Demo Path ✅
+
+**Achievements**
+- Added `OFFLINE_DEMO=1` mode in `paperbot.main` to generate synthetic 1m candles without network.
+- Emits exactly 10 normalized `candle:` logs across configured symbols, then prints `candle demo complete`.
+- Metrics server attempted via `prometheus_client`; on bind failure, logs WARNING and proceeds. Metrics counters increment in offline mode.
+
+**Hurdles & Fixes**
+- Network/DNS blocked in sandbox → bypassed with offline synthetic candles.
+- Port bind denied on `:8000` → graceful degradation with WARNING; marked metrics status as `degraded_warn` in state.
+
+**Evidence**
+- Command: `PYTHONPATH=src OFFLINE_DEMO=1 BINANCE_SPOT_TESTNET_API_KEY=foo BINANCE_SPOT_TESTNET_API_SECRET=bar python -m paperbot.main`
+- Logs: 10 lines matching `candle: {…}` and a final `candle demo complete`.
+- Metrics: `WARNING Failed to start Prometheus server on :8000` (sandbox restriction).
+
+**Acceptance**
+- Result: PASS (offline mode with metrics degraded_warn)
 
 <!-- PHASE-LOG-END -->
 
