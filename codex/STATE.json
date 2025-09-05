@@ -6,13 +6,14 @@
     "phase1_1": "pass",
     "phase1_1_1": "pass",
     "metrics": "degraded_warn",
-    "phase1_2": "pass"
+    "phase1_2": "pass",
+    "phase2_1": "pass"
   },
   "kpis": {
     "tests": "passed",
     "last_summary": "37 passed; Phase 2 exec/risk/ledger: offline demo produced order+fill, parquet written; metrics wired; network bind may be restricted"
   },
-  "next_task": "PHASE_3_OBS_REPORTS",
+  "next_task": "PHASE_2.2_EXEC_REFINEMENTS",
   "backlog": [
     {"id":"PHASE_1_2_STRATEGIES", "title":"Strategy base + MR + Momentum with tests"},
     {"id":"PHASE_2_EXEC_RISK", "title":"Execution simulator + Risk engine + limits + kill-switch"},

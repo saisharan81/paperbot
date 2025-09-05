@@ -23,11 +23,12 @@ An autonomous trading system that starts with **paper trading** (no real money) 
 src/paperbot/
 ├── data/         # exchange adapters, OHLCV/candles fetchers
 ├── features/     # feature pipeline (RSI/ATR/VWAP/Z-score/realized vol)
-├── strategies/   # signal generation (MR, momentum, etc.)
+├── strategies/   # Signal dataclass, base, MR/Momentum, runner
 ├── risk/         # central risk engine + limits + kill-switch
-├── exec/         # paper execution simulator (fees/slippage/partial fills)
-├── metrics/      # Prometheus exporter
-├── reports/      # EOD HTML/CSV
+├── exec/         # order/position/fill models + execution simulator
+├── ledger/       # positions, realized/unrealized PnL, equity/drawdown
+├── metrics/      # Prometheus helpers and counters/gauges
+├── reports/      # EOD HTML/CSV (future)
 └── config/       # config loader & typed settings
 
 config/           # YAML config + Prometheus/Grafana provisioning
@@ -333,6 +334,23 @@ New phase entries will be inserted between these anchors automatically by future
 - Result: PASS (orders + fills + parquet outputs + metrics wired)
 
 <!-- PHASE-LOG-END -->
+
+### Phase 2.1 — Repo Cleanup & Structure Hardening ✅
+
+**Achievements**
+- Ensured all packages have `__init__.py` and clarified public APIs (`ledger.Ledger`).
+- Added `metrics/core.py` wrapper to start Prometheus server safely; kept entrypoint `python -m paperbot.main`.
+- Verified imports use canonical `paperbot.<pkg>` paths; no dead files detected.
+
+**Hurdles & Fixes**
+- Avoiding Prometheus registry duplication in tests → retained safe metric getters and no-op fallback.
+
+**Evidence**
+- Tests: `PYTHONPATH=src pytest -q` pass (≈37 tests).
+- Offline demo: deterministic signals → order + fill → `execution demo complete`.
+
+**Result**
+- PASS
 
 ---
 
