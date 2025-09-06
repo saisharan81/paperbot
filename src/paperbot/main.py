@@ -224,6 +224,28 @@ def main() -> None:
                     ledger.mark_to_market(forced["timestamp"], {symbol: cndl["close"]})
         # Write outputs
         ledger.write_parquet("data")
+        # Decision log for execution demo
+        try:
+            from paperbot.logs.decision_log import append_jsonl
+            market = os.getenv("APP_TRACK", "crypto")
+            path = os.getenv("DECISION_LOG_PATH", "data/decisions/phase2.jsonl")
+            append_jsonl(path, {
+                "ts": int(time.time()*1000),
+                "symbol": "*",
+                "market": market,
+                "strategy": "execution",
+                "action": "demo_complete",
+                "confidence": 1.0,
+                "features_used": [],
+                "signals_used": [],
+                "risk_context": "n/a",
+                "flow_evidence": "offline_demo",
+                "gates_passed": [],
+                "gates_failed": [],
+                "outcome": "completed",
+            })
+        except Exception:
+            pass
         logging.info("candle demo complete")
         logging.info("strategy demo complete")
         logging.info("execution demo complete")

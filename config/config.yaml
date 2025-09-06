@@ -50,3 +50,6 @@ risk:
   daily_loss_cap_pct: 0.01
   max_positions: 3
   max_position_value_per_symbol: 0.2
+
+decision_log:
+  path: data/decisions/phase2.jsonl
