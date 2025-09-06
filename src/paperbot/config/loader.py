@@ -20,6 +20,7 @@ import os
 import yaml
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, field_validator
+import pathlib
 
 class FetchConfig(BaseModel):
     """Tunable parameters for API request pacing and backoff."""
@@ -75,3 +76,26 @@ def load_settings(path: str = "config/config.yaml") -> Settings:
         api_passphrase=api_passphrase,
         fetch=FetchConfig(**fetch),
     )
+
+
+def load_exchange_profile(exchange: str, environment: str) -> Dict[str, Any]:
+    """Load an exchange execution profile YAML from config/exchanges/.
+
+    Selects a profile name based on (exchange, environment). For example,
+    binance + spot-* loads `binance_spot.yml`.
+    """
+    base = pathlib.Path("config/exchanges")
+    name = None
+    ex = exchange.lower()
+    env = environment.lower()
+    if ex == "binance" and "spot" in env:
+        name = "binance_spot.yml"
+    elif ex == "alpaca":
+        name = "alpaca.yml"
+    else:
+        name = "binance_spot.yml"
+    p = base / name
+    if not p.exists():
+        return {}
+    with open(p, "r") as f:
+        return yaml.safe_load(f) or {}

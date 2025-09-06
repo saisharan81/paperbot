@@ -79,3 +79,32 @@ Turn strategy signals into paper orders and simulated fills, track PnL and equit
 - Metrics port bind fails: run via Docker Compose (Prometheus scrapes internal bot:8000) or set `HOLD_METRICS_SECONDS` and curl quickly.
 - No orders/fills online: signals depend on live data and thresholds; extend run duration or use offline deterministic mode.
 - Prometheus duplicates in tests: already mitigated by safe metric getters; avoid manual registry reuse across processes.
+
+
+---
+
+## Phase 2.2 — Execution Refinements
+
+### Purpose
+Make fills more realistic and observable via partial fills, exchange-specific fees/rounding, and slippage models.
+
+### Steps (offline deterministic)
+- Run: `PYTHONPATH=src OFFLINE_DEMO=1 BINANCE_SPOT_TESTNET_API_KEY=foo BINANCE_SPOT_TESTNET_API_SECRET=bar python -m paperbot.main`
+- Expect logs:
+  - `order submitted: {…}`
+  - `fill: {…}` (repeats across ≥2 bars with the same `order_id`)
+  - `execution demo complete`
+- Artifacts: `data/trades.parquet`, `data/ledger.parquet`
+
+### Exchange profiles
+- Location: `config/exchanges/*.yml` (e.g., `binance_spot.yml`, `alpaca.yml`)
+- Fields: `fees.{maker_bps,taker_bps}`, `min_notional`, `tick_size`, `step_size`, `slippage_bps`
+- Auto-load based on `(exchange, environment)` in `config/config.yaml`.
+
+### Slippage models
+- `fixed_bps` (default): use `slippage_bps` from profile or execution config
+- `atr_scaled`: effective bps = base_bps * (atr14/price) * `atr_slip_mult`
+
+### Troubleshooting
+- Min notional block: orders below profile `min_notional` are dropped and counted in `orders_blocked_total{reason="min_notional"}`.
+- Rounding: prices rounded to `tick_size`; quantities floored to `step_size`.

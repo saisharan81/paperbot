@@ -64,7 +64,12 @@ class Ledger:
         if self.equity > self.peak_equity:
             self.peak_equity = self.equity
         drawdown = 1.0 - (self.equity / self.peak_equity if self.peak_equity > 0 else 1.0)
-        self._equity_gauge.set(self.equity)
+        # Label as total account equity
+        try:
+            self._equity_gauge.labels("total").set(self.equity)  # type: ignore[attr-defined]
+        except Exception:
+            # Fallback for unlabeled gauges in constrained runs
+            self._equity_gauge.set(self.equity)
         # store a single consolidated row (symbol blank) for eq/dd snapshot
         self.rows.append(LedgerRow(ts=ts, symbol="", realized_pnl=self.realized_total, unrealized_pnl=unreal_total, equity=self.equity, drawdown=max(0.0, drawdown)))
 

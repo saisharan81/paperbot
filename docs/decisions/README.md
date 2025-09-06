@@ -8,6 +8,8 @@ This folder contains Architecture Decision Records (ADRs) documenting key decisi
 - ADR-0003-metrics-naming.md — metrics names and labels conventions
 - ADR-0004-offline-determinism.md — deterministic offline demo acceptance
 - ADR-0005-branching-and-releases.md — phase branches, PRs, tags
+- ADR-0006-execution-profiles.md — exchange-specific fees/rounding/minimums/slippage
+- ADR-0007-partial-fills.md — liquidity_fraction and remaining qty semantics
 
 ## How to add an ADR
 1. Copy `ADR-0000-template.md` to the next number (e.g., `ADR-0006-<topic>.md`).
@@ -19,4 +21,3 @@ Status keywords:
 - Proposed — for review
 - Accepted — merged and active
 - Superseded — replaced by a newer ADR (link it)
-

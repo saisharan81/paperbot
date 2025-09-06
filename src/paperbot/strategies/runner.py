@@ -6,6 +6,8 @@ StrategyRunner dispatches feature rows to strategies and tracks metrics.
 
 from typing import Any, Dict, List, Optional
 from .base import Strategy, Signal
+import os
+from ..logs.decision_log import append_jsonl
 
 try:
     from prometheus_client import Counter
@@ -43,4 +45,26 @@ class StrategyRunner:
                     except Exception:
                         # Ignore metrics failures in tests
                         pass
+                # Decision log record (v2 groundwork)
+                try:
+                    market = os.getenv("APP_TRACK", "crypto")
+                    rec = {
+                        "ts": int(row.get("timestamp", out.ts)),
+                        "symbol": out.symbol,
+                        "market": market,
+                        "strategy": out.strategy,
+                        "action": out.side,
+                        "confidence": float(out.strength),
+                        "features_used": [k for k in ("rsi14","z_vwap","atr14") if k in row],
+                        "signals_used": [out.strategy],
+                        "risk_context": "n/a",
+                        "flow_evidence": "runner:on_bar",
+                        "gates_passed": [],
+                        "gates_failed": [],
+                        "outcome": "emitted",
+                    }
+                    path = os.getenv("DECISION_LOG_PATH", "data/decisions/phase2.jsonl")
+                    append_jsonl(path, rec)
+                except Exception:
+                    pass
         return signals
