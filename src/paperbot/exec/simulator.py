@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 from .model import Order, Fill
+import random
 from ..metrics.exec import (
     get_orders_submitted_total,
     get_fills_total,
@@ -19,6 +20,12 @@ class ExecutionSimulator:
         self.liquidity_fraction = float(cfg.get("liquidity_fraction", 0.25))
         # slippage model
         self.slippage_model = str(cfg.get("slippage_model", "fixed_bps"))
+        rb = cfg.get("slippage_random_bps_range", [0, 3])
+        try:
+            self.random_bps_min = float(rb[0])
+            self.random_bps_max = float(rb[1])
+        except Exception:
+            self.random_bps_min, self.random_bps_max = 0.0, 3.0
         self.atr_slip_mult = float(cfg.get("atr_slip_mult", 1.0))
         # exchange profile
         prof = profile or {}
@@ -109,6 +116,8 @@ class ExecutionSimulator:
 
     def _slippage_bps(self, price: float, features: Dict[str, Any]) -> float:
         base = self.profile_slip_bps if self.profile_slip_bps else self.slippage_bps_market
+        if self.slippage_model == "random_bps":
+            return float(random.uniform(self.random_bps_min, self.random_bps_max))
         if self.slippage_model == "atr_scaled":
             atr = float(features.get("atr14", 0.0))
             if price > 0:

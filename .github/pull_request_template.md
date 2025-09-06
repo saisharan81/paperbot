@@ -10,6 +10,8 @@
 - [ ] Metrics/Grafana panels verified (signals/orders/fills/fees/equity)
 - [ ] RUNBOOK + ADR index updated
 - [ ] Branch up to date with `main`
+ - [ ] Decision Log V2 JSONL sample present
+ - [ ] Legacy → new metric name migration confirmed (`account_equity_usd`, `fees_paid_usd_total`)
 
 ## Summary
 

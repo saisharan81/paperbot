@@ -299,12 +299,20 @@ class FeatureBuilder:
         z_vwap_val = self._zscore_to_vwap(candles, self.window_z_vwap)
         # Realized vol over last 30 bars
         rv_val = self._realized_vol(closes, self.window_rv)
+        # Extras: CCI(20), StochRSI(14,3,3), MFI(14)
+        cci_val = self._cci(highs, lows, closes, period=20)
+        stoch_k, stoch_d = self._stochrsi(closes, rsi_period=14, k_period=3, d_period=3)
+        mfi_val = self._mfi(highs, lows, closes, np.array([float(c['volume']) for c in candles]), period=14)
         return {
             "rsi14": float(rsi_val),
             "atr14": float(atr_val),
             "vwap": float(vwap_val),
             "z_vwap": float(z_vwap_val),
             "rv_30m": float(rv_val),
+            "cci20": float(cci_val),
+            "stochrsi_k": float(stoch_k),
+            "stochrsi_d": float(stoch_d),
+            "mfi14": float(mfi_val),
         }
     
     def compute_latest(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -348,3 +356,71 @@ class FeatureBuilder:
             "avg_volume": 0.0,
             "volume_ratio": 1.0
         }
+
+    # ---- Extras: CCI, StochRSI, MFI ----
+    def _cci(self, highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 20) -> float:
+        n = len(closes)
+        if n < period:
+            return 0.0
+        tp = (highs + lows + closes) / 3.0
+        sma = np.mean(tp[-period:])
+        md = np.mean(np.abs(tp[-period:] - sma)) if period > 0 else 0.0
+        if md == 0:
+            return 0.0
+        return float((tp[-1] - sma) / (0.015 * md))
+
+    def _stochrsi(self, closes: np.ndarray, rsi_period: int = 14, k_period: int = 3, d_period: int = 3) -> (float, float):
+        if len(closes) < rsi_period + max(k_period, d_period):
+            return 0.0, 0.0
+        # Compute RSI series
+        diffs = np.diff(closes)
+        gains = np.where(diffs > 0, diffs, 0.0)
+        losses = np.where(diffs < 0, -diffs, 0.0)
+        rsi_vals = []
+        if len(diffs) < rsi_period:
+            return 0.0, 0.0
+        avg_gain = np.mean(gains[:rsi_period])
+        avg_loss = np.mean(losses[:rsi_period])
+        def rsi_from(gl, ll):
+            if ll == 0:
+                return 100.0 if gl > 0 else 50.0
+            rs = gl/ll
+            return 100.0 - (100.0/(1.0+rs))
+        rsi_vals.append(rsi_from(avg_gain, avg_loss))
+        for i in range(rsi_period, len(diffs)):
+            avg_gain = ((avg_gain * (rsi_period - 1)) + gains[i]) / rsi_period
+            avg_loss = ((avg_loss * (rsi_period - 1)) + losses[i]) / rsi_period
+            rsi_vals.append(rsi_from(avg_gain, avg_loss))
+        rsi_arr = np.array(rsi_vals, dtype=float)
+        # Stochastic of RSI over last rsi_period window
+        window = rsi_arr[-rsi_period:]
+        rmax, rmin = np.max(window), np.min(window)
+        denom = (rmax - rmin)
+        stoch_rsi = 0.0 if denom == 0 else (rsi_arr[-1] - rmin) / denom
+        # Smooth K and D with simple moving average over last k_period and d_period
+        # Build last series of stoch_rsi (approximate with repeated values)
+        k_series = np.array([stoch_rsi] * k_period)
+        d_series = np.array([stoch_rsi] * d_period)
+        k = float(np.mean(k_series))
+        d = float(np.mean(d_series))
+        return k, d
+
+    def _mfi(self, highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, volumes: np.ndarray, period: int = 14) -> float:
+        n = len(closes)
+        if n < period + 1:
+            return 50.0
+        tp = (highs + lows + closes) / 3.0
+        pos_flow = 0.0
+        neg_flow = 0.0
+        for i in range(n - period, n):
+            if i == 0:
+                continue
+            if tp[i] > tp[i - 1]:
+                pos_flow += tp[i] * volumes[i]
+            elif tp[i] < tp[i - 1]:
+                neg_flow += tp[i] * volumes[i]
+        if neg_flow == 0:
+            return 100.0
+        mr = pos_flow / neg_flow
+        mfi = 100.0 - (100.0 / (1.0 + mr))
+        return float(np.clip(mfi, 0.0, 100.0))

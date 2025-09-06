@@ -1,0 +1,7 @@
+fees:
+  maker_bps: 1.0
+  taker_bps: 1.0
+min_notional: 10.0
+tick_size: 0.01
+step_size: 0.001
+slippage_bps: 2.0

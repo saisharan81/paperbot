@@ -90,8 +90,8 @@ def load_exchange_profile(exchange: str, environment: str) -> Dict[str, Any]:
     env = environment.lower()
     if ex == "binance" and "spot" in env:
         name = "binance_spot.yml"
-    elif ex == "alpaca":
-        name = "alpaca.yml"
+    elif ex == "stocks" and "paper" in env:
+        name = "stocks_paper.yml"
     else:
         name = "binance_spot.yml"
     p = base / name

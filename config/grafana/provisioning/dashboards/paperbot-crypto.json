@@ -1,0 +1,9 @@
+{
+  "__note": "Filtered for market=crypto; queries use *_by_market_* and *_usd_* where applicable",
+  "panels": [
+    {"title": "Orders submitted rate (5m)", "targets": [{"expr": "sum by (type,symbol) (rate(orders_submitted_by_market_total{market=\"crypto\"}[5m]))"}]},
+    {"title": "Fills rate by liquidity (5m)", "targets": [{"expr": "sum by (liquidity,symbol) (rate(fills_by_market_total{market=\"crypto\"}[5m]))"}]},
+    {"title": "Fees paid (1h)", "targets": [{"expr": "sum by (symbol) (increase(fees_paid_usd_total{market=\"crypto\"}[1h]))"}]},
+    {"title": "Equity (total)", "targets": [{"expr": "account_equity_usd{market=\"crypto\"}"}]}
+  ]
+}
