@@ -174,6 +174,7 @@ def main() -> None:
             from paperbot.exec.simulator import ExecutionSimulator
             from paperbot.risk.engine import RiskEngine
             from paperbot.ledger.ledger import Ledger
+            from paperbot.metrics.exec import set_equity_gauges
         except Exception as e:
             logging.warning(f"Failed to import execution modules: {e}")
             logging.info("candle demo complete")
@@ -193,6 +194,7 @@ def main() -> None:
         ledger = Ledger(equity_start=10_000.0)
         risk_engine = RiskEngine(risk_cfg, equity_start=ledger.equity)
 
+        fills_emitted = 0
         # Use the last synthetic candle per symbol for fills and the shaped rows for entries
         for symbol in settings.symbols:
             # Create a shaped feature row to force an entry for each symbol
@@ -220,10 +222,65 @@ def main() -> None:
                         for f in fills:
                             logging.info(f"fill: {f.__dict__}")
                             ledger.on_fill(f)
+                        fills_emitted += len(fills)
                     # MTM at close
                     ledger.mark_to_market(forced["timestamp"], {symbol: cndl["close"]})
+        logging.info(f"fees emitted: {fills_emitted}")
+        # First equity gauge snapshot (mock stocks alongside crypto to provide two markets)
+        try:
+            set_equity_gauges({
+                "crypto": float(ledger.equity),
+                "stocks": float(ledger.equity) * 0.99,
+            })
+            logging.info("equity gauges set (first)")
+        except Exception:
+            pass
         # Write outputs
         ledger.write_parquet("data")
+        # LLM Advisory demo (advisory only; no live orders)
+        try:
+            from paperbot.llm.router import load_llm_config, get_client
+            from paperbot.llm.guards import output_validate
+            from paperbot.llm.memory.sqlite_store import SQLiteStore
+            from paperbot.metrics.llm import get_llm_calls_total, get_decisions_count_total, get_decisions_confidence_hist
+            import json
+            llm_cfg = load_llm_config()
+            client = get_client(llm_cfg)
+            calls = get_llm_calls_total()
+            dcount = get_decisions_count_total()
+            dhist = get_decisions_confidence_hist()
+            store = SQLiteStore()
+            allow = llm_cfg.get("symbol_allowlist", [])
+            conf_floor = float(llm_cfg.get("confidence_floor", 0.6))
+            max_notional = float(llm_cfg.get("max_notional_usd", 200.0))
+            # include a stocks symbol in advisory check
+            symbols_all = list(settings.symbols) + ["AAPL"]
+            for sym in symbols_all:
+                market = "stocks" if sym.isalpha() else "crypto"
+                ctx = {"symbol": sym, "market": market, "max_notional_usd": max_notional}
+                try:
+                    dec = client.generate_decision({}, ctx)
+                    calls.labels(type(client).__name__.lower(), "true").inc()
+                    dec_valid = output_validate(dec, allow, market, sym, conf_floor)
+                    store.insert(dec_valid.model_dump())
+                    dcount.labels(market, sym, dec_valid.side).inc()
+                    dhist.labels(market).observe(dec_valid.confidence)
+                    logging.info(f"decision: {json.dumps(dec_valid.model_dump())}")
+                except Exception:
+                    calls.labels(type(client).__name__.lower(), "false").inc()
+                    continue
+            # Second equity snapshot before finishing advisory
+            try:
+                set_equity_gauges({
+                    "crypto": float(ledger.equity) * 1.001,
+                    "stocks": float(ledger.equity) * 0.995,
+                })
+                logging.info("equity gauges set (second)")
+            except Exception:
+                pass
+            logging.info("llm advisory demo complete")
+        except Exception:
+            pass
         # Decision log for execution demo
         try:
             from paperbot.logs.decision_log import append_jsonl
@@ -346,6 +403,46 @@ def main() -> None:
     
     logging.info("candle demo complete")
     logging.info("strategy demo complete")
+    # ---- Phase 3.0: LLM Advisory (offline advisory; simulated only) ----
+    try:
+        from paperbot.llm.router import load_llm_config, get_client
+        from paperbot.llm.guards import output_validate
+        from paperbot.llm.memory.sqlite_store import SQLiteStore
+        from paperbot.metrics.llm import get_llm_calls_total, get_decisions_count_total, get_decisions_confidence_hist
+        import json
+        llm_cfg = load_llm_config()
+        client = get_client(llm_cfg)
+        calls = get_llm_calls_total()
+        dcount = get_decisions_count_total()
+        dhist = get_decisions_confidence_hist()
+        store = SQLiteStore()
+        allow = llm_cfg.get("symbol_allowlist", [])
+        conf_floor = float(llm_cfg.get("confidence_floor", 0.6))
+        max_notional = float(llm_cfg.get("max_notional_usd", 200.0))
+        # include a stocks symbol in advisory check
+        symbols_all = list(settings.symbols) + ["AAPL"]
+        for symbol in symbols_all:
+            market = "stocks" if symbol.isalpha() else "crypto"
+            ctx = {
+                "symbol": symbol,
+                "market": market,
+                "max_notional_usd": max_notional,
+            }
+            try:
+                dec = client.generate_decision({}, ctx)
+                dec_ok = True
+                calls.labels(type(client).__name__.lower(), str(dec_ok).lower()).inc()
+                dec_valid = output_validate(dec, allow, market, symbol, conf_floor)
+                store.insert(dec_valid.model_dump())
+                dcount.labels(market, symbol, dec_valid.side).inc()
+                dhist.labels(market).observe(dec_valid.confidence)
+                logging.info(f"decision: {json.dumps(dec_valid.model_dump())}")
+            except Exception:
+                calls.labels(type(client).__name__.lower(), "false").inc()
+                continue
+        logging.info("llm advisory demo complete")
+    except Exception:
+        pass
     # Optional: keep the metrics server alive for inspection
     hold = int(os.getenv("HOLD_METRICS_SECONDS", "0"))
     if hold > 0:

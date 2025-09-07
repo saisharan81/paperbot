@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Dict
 import os
 from prometheus_client import Counter, Gauge, REGISTRY
 
@@ -11,6 +11,8 @@ _fees_paid_total: Optional[Counter] = None
 _realized_pnl_total: Optional[Counter] = None
 _equity_gauge: Optional[Gauge] = None
 _killswitch_trips: Optional[Counter] = None
+_fees_paid_usd_total: Optional[Counter] = None
+_account_equity_usd: Optional[Gauge] = None
 
 
 class _NoOp:
@@ -40,6 +42,21 @@ def _safe_counter(name: str, doc: str, labelnames):
 
 def _safe_gauge(name: str, doc: str):
     if os.getenv("DISABLE_PROMETHEUS", "0") == "1":
+        return _NoOp()
+
+
+def _safe_gauge_labels(name: str, doc: str, labelnames):
+    if os.getenv("DISABLE_PROMETHEUS", "0") == "1":
+        return _NoOp()
+    try:
+        return Gauge(name, doc, labelnames)
+    except ValueError:
+        try:
+            for coll in list(REGISTRY._collector_to_names.keys()):  # type: ignore[attr-defined]
+                if isinstance(coll, Gauge) and getattr(coll, "_name", None) == name:
+                    return coll
+        except Exception:
+            pass
         return _NoOp()
     try:
         return Gauge(name, doc)
@@ -81,6 +98,19 @@ def get_fees_paid_total():
     return _fees_paid_total
 
 
+def get_fees_paid_usd_total():
+    """Counter: fees paid in USD, labeled by market and symbol.
+
+    Note: This runs in parallel with legacy `fees_paid_total` for one release.
+    """
+    global _fees_paid_usd_total
+    if _fees_paid_usd_total is None:
+        _fees_paid_usd_total = _safe_counter(
+            "fees_paid_usd_total", "Fees paid in USD", ["market", "symbol"]
+        )
+    return _fees_paid_usd_total
+
+
 def get_realized_pnl_total():
     global _realized_pnl_total
     if _realized_pnl_total is None:
@@ -92,8 +122,35 @@ def get_equity_gauge():
     global _equity_gauge
     if _equity_gauge is None:
         # Labeled by symbol; use symbol="total" for account equity snapshots
-        _equity_gauge = _safe_gauge("equity_gauge", "Equity value")
+        _equity_gauge = _safe_gauge_labels("equity_gauge", "Equity value", ["symbol"])
     return _equity_gauge
+
+
+def get_account_equity_usd():
+    """Gauge: account equity in USD, labeled by market.
+
+    Note: This runs in parallel with legacy `equity_gauge` for one release.
+    """
+    global _account_equity_usd
+    if _account_equity_usd is None:
+        _account_equity_usd = _safe_gauge_labels(
+            "account_equity_usd", "Account equity in USD", ["market"]
+        )
+    return _account_equity_usd
+
+
+def set_equity_gauges(equity_by_market: Dict[str, float]) -> None:
+    """Set account_equity_usd gauge for each provided market.
+
+    Keeps legacy metrics unchanged; this only affects the USD-labeled gauge.
+    """
+    g = get_account_equity_usd()
+    for mkt, val in equity_by_market.items():
+        try:
+            g.labels(market=str(mkt)).set(float(val))  # type: ignore[attr-defined]
+        except Exception:
+            # Metrics are optional in constrained environments
+            continue
 
 
 def get_killswitch_trips_total():

@@ -7,6 +7,7 @@ from ..metrics.exec import (
     get_orders_submitted_total,
     get_fills_total,
     get_fees_paid_total,
+    get_fees_paid_usd_total,
 )
 
 
@@ -42,6 +43,8 @@ class ExecutionSimulator:
         self.orders_submitted = get_orders_submitted_total()
         self.fills_total = get_fills_total()
         self.fees_paid = get_fees_paid_total()
+        # New: USD-denominated fees counter (runs alongside legacy metric)
+        self.fees_paid_usd = get_fees_paid_usd_total()
 
     def submit(self, order: Order, candle: Dict[str, Any], features: Dict[str, Any] | None = None) -> List[Fill]:
         self.orders_submitted.labels(order.type, order.symbol).inc()
@@ -88,6 +91,11 @@ class ExecutionSimulator:
         for f in fills:
             self.fills_total.labels(f.liquidity, f.symbol).inc()
             self.fees_paid.labels(f.symbol).inc(f.fee)
+            # Determine market from symbol heuristic used elsewhere in the codebase
+            market = "stocks" if f.symbol.isalpha() else "crypto"
+            # Fee already computed in quote currency; assume USD pairs for demo
+            fee_usd = float(f.fee)
+            self.fees_paid_usd.labels(market=market, symbol=f.symbol).inc(fee_usd)
         return fills
 
     def mark_to_market(self, positions: Dict[str, Any], price_by_symbol: Dict[str, float]) -> Dict[str, float]:
