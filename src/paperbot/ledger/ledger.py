@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 import os
 import pandas as pd
 from ..exec.model import Position, Fill, Trade, LedgerRow
-from ..metrics.exec import get_realized_pnl_total, get_equity_gauge
+from ..metrics.exec import get_realized_pnl_total, get_equity_gauge, get_account_equity_usd
 
 
 class Ledger:
@@ -18,6 +18,8 @@ class Ledger:
         self.rows: List[LedgerRow] = []
         self._realized_counter = get_realized_pnl_total()
         self._equity_gauge = get_equity_gauge()
+        # New USD equity gauge (labeled by market); keep legacy gauge in parallel
+        self._equity_usd_by_market = get_account_equity_usd()
 
     def _get_pos(self, symbol: str) -> Position:
         return self.positions.get(symbol, Position(symbol=symbol, qty=0.0, avg_price=0.0))
@@ -64,12 +66,31 @@ class Ledger:
         if self.equity > self.peak_equity:
             self.peak_equity = self.equity
         drawdown = 1.0 - (self.equity / self.peak_equity if self.peak_equity > 0 else 1.0)
-        # Label as total account equity
+        # Label as total account equity (robust against missing gauge instances)
         try:
-            self._equity_gauge.labels("total").set(self.equity)  # type: ignore[attr-defined]
+            if self._equity_gauge is None:
+                from ..metrics.exec import get_equity_gauge as _get_eq
+                self._equity_gauge = _get_eq()
+            # Preferred: labeled by symbol
+            try:
+                self._equity_gauge.labels("total").set(self.equity)  # type: ignore[attr-defined]
+            except Exception:
+                # Fallback for unlabeled gauges in constrained runs
+                self._equity_gauge.set(self.equity)  # type: ignore[attr-defined]
         except Exception:
-            # Fallback for unlabeled gauges in constrained runs
-            self._equity_gauge.set(self.equity)
+            pass
+        # Also emit USD equity per inferred market (heuristic: pure alpha symbols => stocks)
+        try:
+            if price_by_symbol:
+                # Prefer the first symbol to infer market for this snapshot
+                first_sym = next(iter(price_by_symbol.keys()))
+                market = "stocks" if str(first_sym).isalpha() else "crypto"
+            else:
+                market = "crypto"
+            self._equity_usd_by_market.labels(market=market).set(self.equity)  # type: ignore[attr-defined]
+        except Exception:
+            # Metrics optional in tests; ignore if not available
+            pass
         # store a single consolidated row (symbol blank) for eq/dd snapshot
         self.rows.append(LedgerRow(ts=ts, symbol="", realized_pnl=self.realized_total, unrealized_pnl=unreal_total, equity=self.equity, drawdown=max(0.0, drawdown)))
 

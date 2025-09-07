@@ -1,0 +1,12 @@
+provider: gemini
+allow_internet: false
+timeouts_ms:
+  connect: 1000
+  read: 4000
+local_openai:
+  enabled: true
+  base_url: "http://localhost:8000/v1"
+  api_key: "local-dev"
+symbol_allowlist: ["BTC/USDT", "ETH/USDT", "AAPL", "TSLA"]
+confidence_floor: 0.6
+max_notional_usd: 200.0
