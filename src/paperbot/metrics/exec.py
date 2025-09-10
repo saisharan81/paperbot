@@ -13,6 +13,7 @@ _equity_gauge: Optional[Gauge] = None
 _killswitch_trips: Optional[Counter] = None
 _fees_paid_usd_total: Optional[Counter] = None
 _account_equity_usd: Optional[Gauge] = None
+_mtm_tick_total: Optional[Counter] = None
 
 
 class _NoOp:
@@ -137,6 +138,16 @@ def get_account_equity_usd():
             "account_equity_usd", "Account equity in USD", ["market"]
         )
     return _account_equity_usd
+
+
+def get_mtm_tick_total():
+    """Counter: count of MTM ticks executed per market."""
+    global _mtm_tick_total
+    if _mtm_tick_total is None:
+        _mtm_tick_total = _safe_counter(
+            "mtm_tick_total", "Mark-to-market ticks executed", ["market"]
+        )
+    return _mtm_tick_total
 
 
 def set_equity_gauges(equity_by_market: Dict[str, float]) -> None:
