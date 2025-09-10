@@ -12,6 +12,8 @@ services:
       - ./src:/app/src
       - ./config:/app/config
     restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
 
   prometheus:
     image: prom/prometheus:latest
