@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 from ..metrics.exec import get_orders_blocked_total, get_killswitch_trips_total
 from ..strategies.base import Signal
 from ..exec.model import Order, new_id
+from ..events.schema import EventEnvelope, RiskBlocked
+from ..events.bus import publish as publish_event
 
 
 class RiskEngine:
@@ -31,6 +33,18 @@ class RiskEngine:
     def approve(self, signal: Signal, features: Dict[str, Any], equity: float) -> Optional[Order]:
         if self.killswitch_on:
             self.orders_blocked.labels("killswitch", signal.symbol).inc()
+            try:
+                evt = RiskBlocked(
+                    ts=ts,
+                    market="crypto",  # conservative default; symbol may not be alpha-only check here
+                    symbol=signal.symbol,
+                    strategy=signal.strategy,
+                    side=signal.side,
+                    reason="killswitch",
+                )
+                publish_event(EventEnvelope(correlation_id=signal.symbol+":"+signal.strategy, event=evt))
+            except Exception:
+                pass
             return None
 
         symbol = signal.symbol
@@ -43,6 +57,18 @@ class RiskEngine:
         open_count = sum(1 for v in self.open_positions.values() if v)
         if side in ("long", "short") and open_count >= self.max_positions and not self.open_positions.get(symbol, False):
             self.orders_blocked.labels("max_positions", symbol).inc()
+            try:
+                evt = RiskBlocked(
+                    ts=ts,
+                    market="crypto",
+                    symbol=symbol,
+                    strategy=signal.strategy,
+                    side=signal.side,
+                    reason="max_positions",
+                )
+                publish_event(EventEnvelope(correlation_id=symbol+":"+signal.strategy, event=evt))
+            except Exception:
+                pass
             return None
 
         # flat = exit if open
@@ -61,12 +87,22 @@ class RiskEngine:
         qty = (equity * self.risk_frac) / stop_dist
         if qty <= 0:
             self.orders_blocked.labels("qty_zero", symbol).inc()
+            try:
+                evt = RiskBlocked(ts=ts, market="crypto", symbol=symbol, strategy=signal.strategy, side=signal.side, reason="qty_zero")
+                publish_event(EventEnvelope(correlation_id=symbol+":"+signal.strategy, event=evt))
+            except Exception:
+                pass
             return None
         # Enforce per-symbol notional cap
         if equity > 0:
             notional_frac = abs(qty * price) / equity if price > 0 else 1.0
             if notional_frac > self.max_position_value_per_symbol:
                 self.orders_blocked.labels("symbol_value_cap", symbol).inc()
+                try:
+                    evt = RiskBlocked(ts=ts, market="crypto", symbol=symbol, strategy=signal.strategy, side=signal.side, reason="symbol_value_cap")
+                    publish_event(EventEnvelope(correlation_id=symbol+":"+signal.strategy, event=evt))
+                except Exception:
+                    pass
                 return None
 
         order_side = "buy" if side == "long" else "sell"

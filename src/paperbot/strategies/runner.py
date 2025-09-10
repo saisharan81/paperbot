@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 from .base import Strategy, Signal
 import os
 from ..logs.decision_log import append_jsonl
+from ..events.schema import OrderIntent, EventEnvelope
+from ..events.bus import publish as publish_event
 
 try:
     from prometheus_client import Counter
@@ -65,6 +67,21 @@ class StrategyRunner:
                     }
                     path = os.getenv("DECISION_LOG_PATH", "data/decisions/phase2.jsonl")
                     append_jsonl(path, rec)
+                except Exception:
+                    pass
+                # Emit an order_intent event (minimal) for strong signals
+                try:
+                    intent = OrderIntent(
+                        ts=int(row.get("timestamp", out.ts)),
+                        market=os.getenv("APP_TRACK", "crypto"),
+                        symbol=out.symbol,
+                        strategy=out.strategy,
+                        side=out.side,
+                        confidence=float(out.strength),
+                        notional_usd=float(row.get("price", row.get("close", 0.0))) * 1.0,
+                    )
+                    env = EventEnvelope(correlation_id=out.symbol + ":" + out.strategy, event=intent)
+                    publish_event(env)
                 except Exception:
                     pass
         return signals

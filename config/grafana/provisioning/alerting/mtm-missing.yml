@@ -12,6 +12,9 @@ groups:
           - refId: A
             queryType: timeSeriesQuery
             datasourceUid: PBFA97CFB590B2093
+            relativeTimeRange:
+              from: 120
+              to: 0
             model:
               expr: absent(increase(mtm_tick_total[1m]))
               intervalMs: 60000
@@ -26,4 +29,3 @@ groups:
           severity: critical
         labels:
           app: paperbot
-

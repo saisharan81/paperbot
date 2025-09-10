@@ -24,6 +24,9 @@ matplotlib = "*"
 duckdb = "*"
 python-dotenv = "*"
 pyyaml = "*"
+redis = "*"
+fastapi = "*"
+uvicorn = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
