@@ -19,6 +19,8 @@
     {"title": "Orders submitted rate (5m)", "targets": [{"expr": "sum by (type,symbol) (rate(orders_submitted_by_market_total{market=\"crypto\"}[5m]))"}]},
     {"title": "Fills rate by liquidity (5m)", "targets": [{"expr": "sum by (liquidity,symbol) (rate(fills_by_market_total{market=\"crypto\"}[5m]))"}]},
     {"title": "Fees paid (1h)", "targets": [{"expr": "sum by (symbol) (increase(fees_paid_usd_total{market=\"crypto\"}[1h]))"}]},
-    {"title": "Equity (total)", "targets": [{"expr": "account_equity_usd{market=\"crypto\"}"}]}
+    {"title": "Equity (total)", "targets": [{"expr": "account_equity_usd{market=\"crypto\"}"}]},
+    {"title": "Logs (Loki) — Stream", "type": "logs", "datasource": "Loki", "targets": [{"query": "{app=\\\"paperbot\\\"}"}]},
+    {"title": "Logs (Loki) — Errors (5m)", "type": "stat", "datasource": "Loki", "targets": [{"query": "sum(count_over_time({app=\\\"paperbot\\\"} |= \\\"ERROR\\\" [5m]))"}]}
   ]
 }
