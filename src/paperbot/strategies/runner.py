@@ -10,6 +10,20 @@ import os
 from ..logs.decision_log import append_jsonl
 from ..events.schema import OrderIntent, EventEnvelope
 from ..events.bus import publish as publish_event
+try:
+    from ..metrics.exec import (
+        inc_pattern_detected,
+        inc_pattern_intent,
+        observe_pattern_to_intent_latency,
+    )
+except Exception:  # pragma: no cover
+    # Metrics optional during tests or constrained envs
+    inc_pattern_detected = inc_pattern_intent = observe_pattern_to_intent_latency = None  # type: ignore
+
+try:
+    from ..logs.decision_log import log_pattern_event
+except Exception:  # pragma: no cover
+    log_pattern_event = None  # type: ignore
 
 try:
     from prometheus_client import Counter
@@ -85,3 +99,54 @@ class StrategyRunner:
                 except Exception:
                     pass
         return signals
+
+
+# ---- Phase 2.5: Pattern observability helpers ----
+
+def record_pattern_detected(market: str, symbol: str, pattern: str, rsi: float, ts: int) -> None:
+    """Increment detection counter and emit structured log."""
+    try:
+        if inc_pattern_detected is not None:
+            inc_pattern_detected(market, symbol, pattern)
+    except Exception:
+        pass
+    try:
+        if log_pattern_event is not None:
+            log_pattern_event("pattern_detected", market, symbol, pattern, rsi=rsi, ts=ts)
+    except Exception:
+        pass
+
+
+def record_pattern_intent(
+    market: str,
+    symbol: str,
+    pattern: str,
+    side: str,
+    ts_detected: int,
+    ts_intent: int,
+) -> None:
+    """Increment intent counter, observe latency, and emit structured log."""
+    try:
+        if inc_pattern_intent is not None:
+            inc_pattern_intent(market, pattern, side)
+    except Exception:
+        pass
+    try:
+        latency_s = max(0.0, (ts_intent - ts_detected) / 1000.0)
+        if observe_pattern_to_intent_latency is not None:
+            observe_pattern_to_intent_latency(latency_s)
+    except Exception:
+        pass
+    try:
+        if log_pattern_event is not None:
+            log_pattern_event(
+                "pattern_intent",
+                market,
+                symbol,
+                pattern,
+                side=side,
+                ts=ts_intent,
+                extra={"ts_detected": ts_detected},
+            )
+    except Exception:
+        pass

@@ -7,6 +7,7 @@ An autonomous trading system that starts with **paper trading** (no real money) 
 - Robust end-to-end pipeline: **Market data → Features → Strategies → Risk → Execution (paper) → Ledger → Reports**
 - Safety-first design: central Risk Engine + kill-switch control
 - Observability: Prometheus metrics + Grafana dashboards + daily EOD reports
+  - New: Pattern Observability (Phase 2.5) — counters/histograms and Loki logs; see docs: `docs/decisions/ADR-0012-pattern-observability.md` and `docs/RUNBOOK.md` → Pattern Observability.
 - Incremental development in **phases**, each with tests and documentation
 
 ## Tech Stack

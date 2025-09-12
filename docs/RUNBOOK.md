@@ -41,12 +41,29 @@ Turn strategy signals into paper orders and simulated fills, track PnL and equit
 - Metrics validation:
   - Prometheus: http://localhost:9090/targets (job `paperbot` UP), http://localhost:9090/graph
   - Grafana (anonymous): http://localhost:3000 → Paperbot Overview
-  - PromQL examples:
+- PromQL examples:
     - `sum by (type,symbol) (orders_submitted_total)`
     - `sum by (liquidity,symbol) (fills_total)`
     - `sum by (symbol) (fees_paid_total)`
     - `equity_gauge`
     - `killswitch_trips_total`
+
+## Pattern Observability (Phase 2.5)
+- Env flags:
+  - `ENABLE_PATTERN_OBS_DEMO=1` to enable a tiny synthetic emitter
+  - `PATTERN_OBS_DEMO_SECONDS=15` interval (seconds)
+- Run demo (Compose with Loki optional):
+  - `ENABLE_PATTERN_OBS_DEMO=1 PATTERN_OBS_DEMO_SECONDS=10 docker compose up`
+- Verify Prometheus metrics:
+  - `curl -s http://localhost:8000/metrics | egrep 'pattern_detected_total|pattern_intent_total|pattern_to_intent_latency_seconds_bucket'`
+- Grafana panels (Paperbot Overview → row "Patterns"):
+  - Detections rate by pattern (5m)
+  - Intents rate by pattern/side (5m)
+  - Latency P50/P95 (s)
+- Loki logs (when running with `-f docker-compose.loki.yml`):
+  - `{app="paperbot"} | json | event="pattern_detected"`
+  - `{app="paperbot"} | json | event="pattern_intent"`
+
 
 ## Metrics to Validate
 - Data/Features (prior phases): `candles_fetched_total`, `features_computed_total`

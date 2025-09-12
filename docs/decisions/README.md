@@ -10,6 +10,7 @@ This folder contains Architecture Decision Records (ADRs) documenting key decisi
 - ADR-0005-branching-and-releases.md — phase branches, PRs, tags
 - ADR-0006-execution-profiles.md — exchange-specific fees/rounding/minimums/slippage
 - ADR-0007-partial-fills.md — liquidity_fraction and remaining qty semantics
+- ADR-0012-pattern-observability.md — counters/histograms and Loki logs for candlestick patterns (Phase 2.5)
 
 ## How to add an ADR
 1. Copy `ADR-0000-template.md` to the next number (e.g., `ADR-0006-<topic>.md`).

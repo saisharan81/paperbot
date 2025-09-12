@@ -78,6 +78,68 @@
       "type": "stat"
     },
     {
+      "type": "row",
+      "title": "Patterns",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "id": 20
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 57 },
+      "id": 21,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true } },
+      "targets": [ { "expr": "sum by (pattern) (rate(pattern_detected_total[5m]))", "refId": "A", "legendFormat": "{{pattern}}" } ],
+      "title": "Pattern detections rate (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 57 },
+      "id": 22,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true } },
+      "targets": [ { "expr": "sum by (pattern,side) (rate(pattern_intent_total[5m]))", "refId": "A", "legendFormat": "{{pattern}} {{side}}" } ],
+      "title": "Pattern intents rate (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 65 },
+      "id": 23,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
+      "targets": [ { "expr": "histogram_quantile(0.5, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))", "refId": "A" } ],
+      "title": "Pattern→Intent latency P50 (s)",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 65 },
+      "id": 24,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
+      "targets": [ { "expr": "histogram_quantile(0.95, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))", "refId": "A" } ],
+      "title": "Pattern→Intent latency P95 (s)",
+      "type": "stat"
+    },
+    {
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 71 },
+      "id": 25,
+      "targets": [ { "query": "{app=\"paperbot\"} | json | event=\"pattern_detected\"" } ],
+      "title": "Logs — pattern_detected",
+      "type": "logs"
+    },
+    {
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 71 },
+      "id": 26,
+      "targets": [ { "query": "{app=\"paperbot\"} | json | event=\"pattern_intent\"" } ],
+      "title": "Logs — pattern_intent",
+      "type": "logs"
+    },
+    {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {

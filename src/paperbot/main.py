@@ -25,6 +25,7 @@ import threading
 from paperbot.config.loader import load_settings
 from paperbot.features.feature_builder import FeatureBuilder
 from prometheus_client import start_http_server, Counter
+from typing import Optional
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -45,6 +46,37 @@ def main() -> None:
         logging.info(f"Prometheus metrics server started on :{prom_port}")
     except OSError as e:
         logging.warning(f"Failed to start Prometheus server on :{prom_port}: {e}")
+
+    # Optional: Phase 2.5 Pattern Observability demo emitter (env-gated)
+    if os.getenv("ENABLE_PATTERN_OBS_DEMO", "0") == "1":
+        try:
+            from paperbot.strategies.runner import record_pattern_detected, record_pattern_intent
+        except Exception:
+            record_pattern_detected = record_pattern_intent = None  # type: ignore
+
+        interval_s = int(os.getenv("PATTERN_OBS_DEMO_SECONDS", "15"))
+
+        def _pattern_demo_loop():
+            symbol = "BTC/USDT"
+            market = os.getenv("APP_TRACK", "crypto")
+            pattern = "bullish_engulfing"
+            rsi_val: Optional[float] = 33.0
+            while True:
+                try:
+                    ts_det = int(time.time() * 1000)
+                    if record_pattern_detected is not None:
+                        record_pattern_detected(market, symbol, pattern, rsi_val or 0.0, ts_det)
+                    # Simulate small processing delay before intent
+                    time.sleep(0.5)
+                    ts_int = int(time.time() * 1000)
+                    if record_pattern_intent is not None:
+                        record_pattern_intent(market, symbol, pattern, "long", ts_det, ts_int)
+                except Exception:
+                    pass
+                time.sleep(max(1, interval_s))
+
+        threading.Thread(target=_pattern_demo_loop, daemon=True).start()
+        logging.info("Pattern observability demo enabled (ENABLE_PATTERN_OBS_DEMO=1)")
 
     # Define metrics
     CANDLES_FETCHED = Counter("candles_fetched_total", "Candles fetched", ["symbol"]) 
