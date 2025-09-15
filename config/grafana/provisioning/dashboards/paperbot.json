@@ -127,7 +127,7 @@
       "datasource": "Loki",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 71 },
       "id": 25,
-      "targets": [ { "query": "{app=\"paperbot\"} | json | event=\"pattern_detected\"" } ],
+      "targets": [ { "query": "{app=\"paperbot\"} |= \"pattern_detected\" " } ],
       "title": "Logs — pattern_detected",
       "type": "logs"
     },
@@ -135,7 +135,7 @@
       "datasource": "Loki",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 71 },
       "id": 26,
-      "targets": [ { "query": "{app=\"paperbot\"} | json | event=\"pattern_intent\"" } ],
+      "targets": [ { "query": "{app=\"paperbot\"} |= \"pattern_intent\" " } ],
       "title": "Logs — pattern_intent",
       "type": "logs"
     },
