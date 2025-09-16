@@ -21,9 +21,11 @@ import logging
 import os
 import yaml
 import time
+import threading
 from paperbot.config.loader import load_settings
 from paperbot.features.feature_builder import FeatureBuilder
 from prometheus_client import start_http_server, Counter
+from typing import Optional
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -44,6 +46,37 @@ def main() -> None:
         logging.info(f"Prometheus metrics server started on :{prom_port}")
     except OSError as e:
         logging.warning(f"Failed to start Prometheus server on :{prom_port}: {e}")
+
+    # Optional: Phase 2.5 Pattern Observability demo emitter (env-gated)
+    if os.getenv("ENABLE_PATTERN_OBS_DEMO", "0") == "1":
+        try:
+            from paperbot.strategies.runner import record_pattern_detected, record_pattern_intent
+        except Exception:
+            record_pattern_detected = record_pattern_intent = None  # type: ignore
+
+        interval_s = int(os.getenv("PATTERN_OBS_DEMO_SECONDS", "15"))
+
+        def _pattern_demo_loop():
+            symbol = "BTC/USDT"
+            market = os.getenv("APP_TRACK", "crypto")
+            pattern = "bullish_engulfing"
+            rsi_val: Optional[float] = 33.0
+            while True:
+                try:
+                    ts_det = int(time.time() * 1000)
+                    if record_pattern_detected is not None:
+                        record_pattern_detected(market, symbol, pattern, rsi_val or 0.0, ts_det)
+                    # Simulate small processing delay before intent
+                    time.sleep(0.5)
+                    ts_int = int(time.time() * 1000)
+                    if record_pattern_intent is not None:
+                        record_pattern_intent(market, symbol, pattern, "long", ts_det, ts_int)
+                except Exception:
+                    pass
+                time.sleep(max(1, interval_s))
+
+        threading.Thread(target=_pattern_demo_loop, daemon=True).start()
+        logging.info("Pattern observability demo enabled (ENABLE_PATTERN_OBS_DEMO=1)")
 
     # Define metrics
     CANDLES_FETCHED = Counter("candles_fetched_total", "Candles fetched", ["symbol"]) 
@@ -237,6 +270,38 @@ def main() -> None:
             pass
         # Write outputs
         ledger.write_parquet("data")
+
+        # Optional: start a lightweight MTM ticker (does not affect core demo determinism)
+        try:
+            from paperbot.metrics.exec import set_equity_gauges, get_mtm_tick_total
+            tick_secs = int(os.getenv("MTM_TICK_SECONDS", os.getenv("EQUITY_TICK_SECONDS", "15")))
+            enable_tick = os.getenv("ENABLE_MTM_TICK", "0") == "1"
+            hold = int(os.getenv("HOLD_METRICS_SECONDS", "0"))
+            if enable_tick and tick_secs > 0 and hold > 0:
+                mtm_counter = get_mtm_tick_total()
+
+                # Capture last known prices for a simple MTM tick; in demo we reuse last close
+                last_prices = {s: 100.0 for s in settings.symbols}
+
+                def _mtm_loop(duration_s: int):
+                    deadline = time.time() + duration_s
+                    while time.time() < deadline:
+                        # Recompute equity snapshot and emit gauges
+                        try:
+                            # Reuse last price (demo); in online mode, fetcher would supply fresh prices
+                            ledger.mark_to_market(int(time.time() * 1000), last_prices)
+                            set_equity_gauges({
+                                "crypto": float(ledger.equity),
+                            })
+                            mtm_counter.labels("crypto").inc()
+                        except Exception:
+                            pass
+                        time.sleep(tick_secs)
+
+                t = threading.Thread(target=_mtm_loop, args=(hold,), daemon=True)
+                t.start()
+        except Exception:
+            pass
         # LLM Advisory demo (advisory only; no live orders)
         try:
             from paperbot.llm.router import load_llm_config, get_client
@@ -402,6 +467,29 @@ def main() -> None:
                 signals_remaining -= 1
     
     logging.info("candle demo complete")
+    # Optional: start a lightweight MTM ticker for online/demo mode
+    try:
+        from paperbot.metrics.exec import set_equity_gauges, get_mtm_tick_total
+        tick_secs = int(os.getenv("MTM_TICK_SECONDS", os.getenv("EQUITY_TICK_SECONDS", "15")))
+        enable_tick = os.getenv("ENABLE_MTM_TICK", "1") == "1"
+        # Online mode may not have a ledger; synthesize a basic equity tracker from start equity
+        equity_usd = float(os.getenv("EQUITY_START_USD", "10000"))
+        mtm_counter = get_mtm_tick_total()
+
+        if enable_tick and tick_secs > 0:
+            def _mtm_loop_online():
+                while True:
+                    try:
+                        # Emit a steady equity value as a heartbeat; strategies can update later when ledger is introduced
+                        set_equity_gauges({"crypto": equity_usd})
+                        mtm_counter.labels("crypto").inc()
+                    except Exception:
+                        pass
+                    time.sleep(tick_secs)
+
+            threading.Thread(target=_mtm_loop_online, daemon=True).start()
+    except Exception:
+        pass
     logging.info("strategy demo complete")
     # ---- Phase 3.0: LLM Advisory (offline advisory; simulated only) ----
     try:

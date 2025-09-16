@@ -1,0 +1,31 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: paperbot-alerts
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: mtm-missing
+        title: MTM tick missing
+        condition: A
+        data:
+          - refId: A
+            queryType: timeSeriesQuery
+            datasourceUid: PBFA97CFB590B2093
+            relativeTimeRange:
+              from: 120
+              to: 0
+            model:
+              expr: absent(increase(mtm_tick_total[1m]))
+              intervalMs: 60000
+              maxDataPoints: 43200
+              datasource:
+                type: prometheus
+                uid: PBFA97CFB590B2093
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          severity: critical
+        labels:
+          app: paperbot

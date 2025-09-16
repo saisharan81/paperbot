@@ -9,6 +9,8 @@ from ..metrics.exec import (
     get_fees_paid_total,
     get_fees_paid_usd_total,
 )
+from ..events.schema import EventEnvelope, OrderSubmitted, OrderPartiallyFilled, OrderFilled, OrderRejected
+from ..events.bus import publish as publish_event
 
 
 class ExecutionSimulator:
@@ -59,6 +61,18 @@ class ExecutionSimulator:
         from ..metrics.exec import get_orders_blocked_total
         if self.min_notional and notional < self.min_notional:
             get_orders_blocked_total().labels("min_notional", order.symbol).inc()
+            try:
+                evt = OrderRejected(
+                    ts=ts,
+                    market="stocks" if order.symbol.isalpha() else "crypto",
+                    symbol=order.symbol,
+                    strategy=order.strategy,
+                    side=order.side,
+                    reason="min_notional",
+                )
+                publish_event(EventEnvelope(correlation_id=order.id, event=evt))
+            except Exception:
+                pass
             return fills
 
         # remaining qty
@@ -74,6 +88,20 @@ class ExecutionSimulator:
             price = self._round_tick(close * slip_mult)
             fee = abs(price * to_fill) * (self.taker_bps / 10_000.0)
             qty_signed = to_fill if order.side == "buy" else -to_fill
+            try:
+                evt = OrderSubmitted(
+                    ts=ts,
+                    market="stocks" if order.symbol.isalpha() else "crypto",
+                    symbol=order.symbol,
+                    strategy=order.strategy,
+                    side=order.side,
+                    order_id=order.id,
+                    qty=float(order.qty),
+                    price=None,
+                )
+                publish_event(EventEnvelope(correlation_id=order.id, event=evt))
+            except Exception:
+                pass
             fills.append(Fill(order_id=order.id, ts=ts, symbol=order.symbol, qty=qty_signed, price=price, fee=fee, liquidity="taker"))
         else:
             limit_price = self._round_tick(float(order.price or close))
@@ -96,7 +124,44 @@ class ExecutionSimulator:
             # Fee already computed in quote currency; assume USD pairs for demo
             fee_usd = float(f.fee)
             self.fees_paid_usd.labels(market=market, symbol=f.symbol).inc(fee_usd)
+            # Emit partial-fill event (even if full fill occurs later)
+            try:
+                evt = OrderPartiallyFilled(
+                    ts=f.ts,
+                    market=market,
+                    symbol=f.symbol,
+                    strategy=order.strategy,
+                    side=order.side,
+                    order_id=f.order_id,
+                    qty=abs(f.qty),
+                    price=f.price,
+                    fee_usd=fee_usd,
+                    slippage_bps=None,
+                )
+                publish_event(EventEnvelope(correlation_id=order.id, event=evt))
+            except Exception:
+                pass
+        # If fully filled on this call, emit order_filled
+        try:
+            if new_remaining == 0.0 and fills:
+                total_qty = sum(abs(f.qty) for f in fills)
+                avg_price = sum(abs(f.qty) * f.price for f in fills) / max(total_qty, 1e-9)
+                evt2 = OrderFilled(
+                    ts=fills[-1].ts,
+                    market="stocks" if order.symbol.isalpha() else "crypto",
+                    symbol=order.symbol,
+                    strategy=order.strategy,
+                    side=order.side,
+                    order_id=order.id,
+                    qty=total_qty,
+                    avg_price=avg_price,
+                    fee_usd=sum(float(f.fee) for f in fills),
+                )
+                publish_event(EventEnvelope(correlation_id=order.id, event=evt2))
+        except Exception:
+            pass
         return fills
+
 
     def mark_to_market(self, positions: Dict[str, Any], price_by_symbol: Dict[str, float]) -> Dict[str, float]:
         unreal: Dict[str, float] = {}

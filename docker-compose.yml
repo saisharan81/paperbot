@@ -12,6 +12,8 @@ services:
       - ./src:/app/src
       - ./config:/app/config
     restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
 
   prometheus:
     image: prom/prometheus:latest
@@ -38,3 +40,14 @@ services:
       - ./config/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  redis-data:
