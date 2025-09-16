@@ -34,10 +34,13 @@ def _safe_counter(name: str, doc: str, labelnames):
     try:
         return Counter(name, doc, labelnames)
     except ValueError:
-        # Try to find existing collector in default REGISTRY
+        # Try to find existing collector in default REGISTRY (by name)
         try:
-            for coll in list(REGISTRY._collector_to_names.keys()):  # type: ignore[attr-defined]
-                if isinstance(coll, Counter) and getattr(coll, "_name", None) == name:
+            coll = getattr(REGISTRY, "_names_to_collectors", {}).get(name)
+            if coll is not None:
+                return coll
+            for coll in list(getattr(REGISTRY, "_collector_to_names", {}).keys()):  # type: ignore[attr-defined]
+                if getattr(coll, "_name", None) == name:
                     return coll
         except Exception:
             pass
@@ -88,8 +91,11 @@ def _safe_histogram(name: str, doc: str, labelnames=None, buckets=None):
             return Histogram(name, doc)
     except ValueError:
         try:
-            for coll in list(REGISTRY._collector_to_names.keys()):  # type: ignore[attr-defined]
-                if isinstance(coll, Histogram) and getattr(coll, "_name", None) == name:
+            coll = getattr(REGISTRY, "_names_to_collectors", {}).get(name)
+            if coll is not None:
+                return coll
+            for coll in list(getattr(REGISTRY, "_collector_to_names", {}).keys()):  # type: ignore[attr-defined]
+                if getattr(coll, "_name", None) == name:
                     return coll
         except Exception:
             pass
