@@ -34,8 +34,9 @@ Sample Queries
   - `histogram_quantile(0.5, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))`
   - `histogram_quantile(0.95, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))`
 - Loki (logs):
-  - `{app="paperbot"} | json | event="pattern_detected"`
-  - `{app="paperbot"} | json | event="pattern_intent"`
+  - `{app="paperbot"} |= "pattern_detected"`
+  - `{app="paperbot"} |= "pattern_intent"`
+  - Optional JSON filter (if supported): `| json | event == "pattern_detected"`
 
 Consequences
 - Minimal, backwards-compatible additions; no impact to trading logic.

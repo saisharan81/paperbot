@@ -61,8 +61,9 @@ Turn strategy signals into paper orders and simulated fills, track PnL and equit
   - Intents rate by pattern/side (5m)
   - Latency P50/P95 (s)
 - Loki logs (when running with `-f docker-compose.loki.yml`):
-  - `{app="paperbot"} | json | event="pattern_detected"`
-  - `{app="paperbot"} | json | event="pattern_intent"`
+  - `{app="paperbot"} |= "pattern_detected"`
+  - `{app="paperbot"} |= "pattern_intent"`
+  - Optional JSON filter (if supported): `{app="paperbot"} | json | event == "pattern_detected"`
 
 
 ## Metrics to Validate

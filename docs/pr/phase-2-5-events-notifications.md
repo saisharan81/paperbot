@@ -41,8 +41,10 @@ Introduce lightweight, strategy-agnostic observability for candlestick pattern e
   - P50: `histogram_quantile(0.5, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))`
   - P95: `histogram_quantile(0.95, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))`
 - Loki (optional overlay `-f docker-compose.loki.yml`):
-  - `{app="paperbot"} | json | event="pattern_detected"`
-  - `{app="paperbot"} | json | event="pattern_intent"`
+  - `{app="paperbot"} |= "pattern_detected"`
+  - `{app="paperbot"} |= "pattern_intent"`
+  - Note: If you prefer JSON filtering and your Loki supports it, use
+    `{app="paperbot"} | json | event == "pattern_detected"` (and `pattern_intent`).
 
 ## Compatibility
 - Additive; no changes to existing strategy/execution flows.
