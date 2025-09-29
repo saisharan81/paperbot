@@ -11,6 +11,7 @@ _fees_paid_total: Optional[Counter] = None
 _realized_pnl_total: Optional[Counter] = None
 _equity_gauge: Optional[Gauge] = None
 _killswitch_trips: Optional[Counter] = None
+_killswitch_active: Optional[Gauge] = None
 _fees_paid_usd_total: Optional[Counter] = None
 _account_equity_usd: Optional[Gauge] = None
 _mtm_tick_total: Optional[Counter] = None
@@ -49,6 +50,16 @@ def _safe_counter(name: str, doc: str, labelnames):
 
 def _safe_gauge(name: str, doc: str):
     if os.getenv("DISABLE_PROMETHEUS", "0") == "1":
+        return _NoOp()
+    try:
+        return Gauge(name, doc)
+    except ValueError:
+        try:
+            for coll in list(REGISTRY._collector_to_names.keys()):  # type: ignore[attr-defined]
+                if isinstance(coll, Gauge) and getattr(coll, "_name", None) == name:
+                    return coll
+        except Exception:
+            pass
         return _NoOp()
 
 
@@ -200,6 +211,24 @@ def get_killswitch_trips_total():
     if _killswitch_trips is None:
         _killswitch_trips = _safe_counter("killswitch_trips_total", "Kill switch trips", [])
     return _killswitch_trips
+
+
+def get_killswitch_active():
+    """Gauge: kill switch state by market (1 active, 0 inactive)."""
+    global _killswitch_active
+    if _killswitch_active is None:
+        _killswitch_active = _safe_gauge_labels(
+            "paperbot_killswitch_active", "Kill switch active state", ["market"]
+        )
+    return _killswitch_active
+
+
+def set_killswitch_state(market: str, active: bool) -> None:
+    gauge = get_killswitch_active()
+    try:
+        gauge.labels(market=str(market)).set(1 if active else 0)  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 
 # ---- Phase 2.5: Pattern observability ----

@@ -462,7 +462,7 @@
     {
       "datasource": "Prometheus",
       "fieldConfig": {"defaults": {}, "overrides": []},
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 50 },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 50 },
       "id": 10,
       "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
       "targets": [ { "expr": "sum by (symbol) (increase(fees_paid_total[1h]))", "refId": "A", "legendFormat": "{{symbol}}" } ],
@@ -472,11 +472,56 @@
     {
       "datasource": "Prometheus",
       "fieldConfig": {"defaults": {}, "overrides": []},
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 50 },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 50 },
       "id": 11,
       "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
       "targets": [ { "expr": "equity_gauge{symbol=\"total\"}", "refId": "A", "legendFormat": "equity total" } ],
       "title": "Equity (total)",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 50 },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": true
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "paperbot_killswitch_active{market=\"crypto\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "RISK: Kill Switch Status (0=OFF, 1=ON)",
       "type": "stat"
     }
   ],

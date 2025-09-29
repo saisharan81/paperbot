@@ -25,6 +25,8 @@ class Order:
     strategy: str
     reason: str
     params: Dict[str, Any]
+    fee_currency: Optional[str] = None
+    fee_amount: float = 0.0
 
 
 @dataclass
@@ -35,6 +37,8 @@ class Fill:
     qty: float
     price: float
     fee: float
+    fee_currency: str
+    fee_usd: float
     liquidity: Liquidity
 
 
@@ -53,6 +57,8 @@ class Trade:
     qty: float
     price: float
     fee: float
+    fee_currency: str
+    fee_usd: float
     realized_pnl: float
 
 
@@ -64,4 +70,3 @@ class LedgerRow:
     unrealized_pnl: float
     equity: float
     drawdown: float
-

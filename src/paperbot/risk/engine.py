@@ -6,10 +6,11 @@ from ..strategies.base import Signal
 from ..exec.model import Order, new_id
 from ..events.schema import EventEnvelope, RiskBlocked
 from ..events.bus import publish as publish_event
+from .killswitch import check_killswitch, set_killswitch_state as record_killswitch_state
 
 
 class RiskEngine:
-    def __init__(self, config: Dict[str, Any], equity_start: float):
+    def __init__(self, config: Dict[str, Any], equity_start: float, market: str = "crypto"):
         cfg = config or {}
         self.risk_frac = float(cfg.get("risk_frac", 0.0025))
         self.atr_stop_mult = float(cfg.get("atr_stop_mult", 1.5))
@@ -18,25 +19,32 @@ class RiskEngine:
         self.max_positions = int(cfg.get("max_positions", 3))
         self.max_position_value_per_symbol = float(cfg.get("max_position_value_per_symbol", 0.2))
         self.equity_start_of_day = float(equity_start)
-        self.killswitch_on = False
+        self.market = market or "crypto"
+        existing_state = check_killswitch(market)
+        self.is_active = bool(existing_state)
+        self.killswitch_on = self.is_active  # backwards-compatibility alias
         self.open_positions: Dict[str, bool] = {}
         # Metrics
         self.orders_blocked = get_orders_blocked_total()
         self.killswitch_trips = get_killswitch_trips_total()
+        if not self.is_active:
+            record_killswitch_state(self.market, False)
 
     def on_realized_pnl(self, equity: float) -> None:
         if equity <= self.equity_start_of_day * (1.0 - self.daily_loss_cap_pct):
-            if not self.killswitch_on:
-                self.killswitch_on = True
+            if not self.is_active:
                 self.killswitch_trips.inc()
+                self._set_killswitch(True)
 
     def approve(self, signal: Signal, features: Dict[str, Any], equity: float) -> Optional[Order]:
-        if self.killswitch_on:
+        ts = int(features.get("timestamp", signal.ts))
+        market = self.market if not signal.symbol.isalpha() else "stocks"
+        if self.is_active or check_killswitch(self.market):
             self.orders_blocked.labels("killswitch", signal.symbol).inc()
             try:
                 evt = RiskBlocked(
                     ts=ts,
-                    market="crypto",  # conservative default; symbol may not be alpha-only check here
+                    market=market,
                     symbol=signal.symbol,
                     strategy=signal.strategy,
                     side=signal.side,
@@ -51,7 +59,6 @@ class RiskEngine:
         side = signal.side
         price = float(features.get("price", 0.0)) or float(features.get("close", 0.0))
         atr14 = float(features.get("atr14", 0.0))
-        ts = int(features.get("timestamp", signal.ts))
 
         # Manage max positions
         open_count = sum(1 for v in self.open_positions.values() if v)
@@ -111,3 +118,11 @@ class RiskEngine:
             id=new_id(), ts=ts, symbol=symbol, side=order_side, type="market",
             qty=float(qty), price=None, strategy=signal.strategy, reason=signal.reason, params=signal.params,
         )
+
+    def _set_killswitch(self, active: bool) -> None:
+        self.is_active = bool(active)
+        self.killswitch_on = self.is_active
+        record_killswitch_state(self.market, self.is_active)
+
+    def reset_killswitch(self) -> None:
+        self._set_killswitch(False)

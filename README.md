@@ -97,6 +97,25 @@ curl http://localhost:8000/metrics | head -n 10
 
 ## Local Development (venv)
 
+### Using Poetry (recommended)
+
+```bash
+poetry install --with dev
+source scripts/setup_env.sh  # adds .venv/bin to PATH and exports PYTHONPATH=src
+
+# sanity checks
+PYTHONPATH=src pytest -q
+ruff check
+flake8
+
+# demo (offline deterministic)
+OFFLINE_DEMO=1 ENABLE_PATTERN_OBS_DEMO=1 \ 
+  BINANCE_SPOT_TESTNET_API_KEY=dummy BINANCE_SPOT_TESTNET_API_SECRET=dummy \ 
+  python -m paperbot.main
+```
+
+### Manual virtualenv
+
 ```bash
 # Python 3.11
 python3.11 -m venv .venv
@@ -104,7 +123,7 @@ source .venv/bin/activate
 
 # Install deps
 pip install -U pip setuptools wheel
-pip install ccxt pandas numpy pyarrow ta pandas-ta pydantic prometheus_client jinja2 matplotlib duckdb python-dotenv pyyaml pytest pytest-mock black ruff
+pip install ccxt pandas numpy pyarrow ta pandas-ta pydantic prometheus_client jinja2 matplotlib duckdb python-dotenv pyyaml pytest pytest-mock black ruff flake8
 
 # Export env and run
 set -a; source .env; set +a

@@ -22,10 +22,21 @@ def test_fees_paid_usd_total_increments_on_fill():
 def test_account_equity_usd_set_after_mtm():
     led = Ledger(equity_start=10_000.0)
     # Open a position to move equity and then MTM
-    led.on_fill(Fill(order_id="1", ts=1, symbol="BTC/USDT", qty=1.0, price=100.0, fee=0.01, liquidity="taker"))
+    led.on_fill(
+        Fill(
+            order_id="1",
+            ts=1,
+            symbol="BTC/USDT",
+            qty=1.0,
+            price=100.0,
+            fee=0.01,
+            fee_currency="USDT",
+            fee_usd=0.01,
+            liquidity="taker",
+        )
+    )
     led.mark_to_market(2, {"BTC/USDT": 105.0})
 
     # Gauge should be set for inferred market=crypto
     val = REGISTRY.get_sample_value("account_equity_usd", {"market": "crypto"})
     assert val is not None and val > 0.0
-
