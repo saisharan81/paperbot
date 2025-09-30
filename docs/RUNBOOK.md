@@ -65,6 +65,41 @@ Turn strategy signals into paper orders and simulated fills, track PnL and equit
   - `{app="paperbot"} |= "pattern_intent"`
   - Optional JSON filter (if supported): `{app="paperbot"} | json | event == "pattern_detected"`
 
+## Phase 3 Go-Live Checklist — Paper Trading Readiness
+
+1. **Bootstrap dev environment**
+   - `poetry install --with dev`
+   - `source scripts/setup_env.sh` (adds `.venv/bin` to `PATH`, exports `PYTHONPATH=src`)
+   - `PYTHONPATH=src pytest -q` — expect `58 passed, 1 skipped` (includes new killswitch + LLM guard tests).
+   - `ruff check` / `flake8` should both succeed without findings.
+
+2. **Start full observability stack**
+   - `docker compose -f docker-compose.yml -f docker-compose.loki.yml up --build`
+   - Confirm Prometheus target healthy: http://localhost:9090/targets → `paperbot` **UP**.
+   - Grafana dashboards: http://localhost:3000 → validate "Paperbot Overview" loads; look for new risk widgets showing `paperbot_killswitch_active`.
+   - Loki log tail (optional): `docker compose logs -f loki promtail`.
+
+3. **Runtime smoke (offline demo)**
+   - `PYTHONPATH=src OFFLINE_DEMO=1 ENABLE_PATTERN_OBS_DEMO=1 HOLD_METRICS_SECONDS=60 \`
+     `BINANCE_SPOT_TESTNET_API_KEY=dummy BINANCE_SPOT_TESTNET_API_SECRET=dummy \`
+     `python -m paperbot.main`
+   - During hold: `curl -s http://localhost:8000/metrics | egrep 'paperbot_killswitch_active|account_equity_usd|pattern_detected_total'`
+     - Expect `paperbot_killswitch_active{market="crypto"} 0` initially. Trip via test (`pytest -k killswitch`) to observe `1`.
+   - Logs (stdout or Loki) should include at least one `event="pattern_detected"` and `event="pattern_intent"` JSON line.
+
+4. **Risk controls**
+   - Run targeted tests: `pytest tests/test_risk_engine.py -k killswitch`.
+   - Inspect metrics after forcing loss scenario (manually adjust ledger or run dedicated script) to ensure `paperbot_killswitch_active` flips to 1 and `orders_blocked_total{reason="killswitch"}` increments.
+
+5. **LLM guardrails**
+   - Run `pytest tests/test_llm_guards.py` to assert notional guard behaviour.
+   - In demo logs, confirm guard denial emits JSON with `event="llm_guard_denied"` when size exceeds the configured cap.
+
+6. **Simulator fee sanity**
+   - `pytest tests/test_exec_simulator.py::test_fee_conversion_non_usd_pair_updates_ledger` ensures BTC-fee on BTC/ETH converts via oracle overrides and ledger deducts USD fee.
+
+Document findings and attach Prometheus/Grafana screenshots in the Phase 3 PR description.
+
 
 ## Metrics to Validate
 - Data/Features (prior phases): `candles_fetched_total`, `features_computed_total`

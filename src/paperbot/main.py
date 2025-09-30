@@ -326,7 +326,9 @@ def main() -> None:
                 try:
                     dec = client.generate_decision({}, ctx)
                     calls.labels(type(client).__name__.lower(), "true").inc()
-                    dec_valid = output_validate(dec, allow, market, sym, conf_floor)
+                    dec_valid = output_validate(
+                        dec, allow, market, sym, conf_floor, max_notional
+                    )
                     store.insert(dec_valid.model_dump())
                     dcount.labels(market, sym, dec_valid.side).inc()
                     dhist.labels(market).observe(dec_valid.confidence)
@@ -520,7 +522,9 @@ def main() -> None:
                 dec = client.generate_decision({}, ctx)
                 dec_ok = True
                 calls.labels(type(client).__name__.lower(), str(dec_ok).lower()).inc()
-                dec_valid = output_validate(dec, allow, market, symbol, conf_floor)
+                dec_valid = output_validate(
+                    dec, allow, market, symbol, conf_floor, max_notional
+                )
                 store.insert(dec_valid.model_dump())
                 dcount.labels(market, symbol, dec_valid.side).inc()
                 dhist.labels(market).observe(dec_valid.confidence)

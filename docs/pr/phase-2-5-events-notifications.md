@@ -1,62 +1,58 @@
-# Phase 2.5: Pattern Observability (Events + Notifications)
+# Phase 2.5: Risk Daily Loss Limit Notifications
 
 ## Summary
-Introduce lightweight, strategy-agnostic observability for candlestick pattern events. Adds Prometheus counters/histogram, Loki-structured logs, Grafana panels, a simple alert, and an ENV-gated synthetic emitter to validate locally without depending on unmerged strategy code.
+Introduce explicit daily-loss stop handling so the risk engine can halt trading for
+the session without engaging the global kill switch. The branch adds shared halt
+flags, a `DailyLossLimitBreach` event, richer blocking reasons, and pytest
+coverage to guard the behaviour.
 
 ## Changes
-- Metrics (src/paperbot/metrics/exec.py)
-  - Counter: `pattern_detected_total{market,symbol,pattern}`
-  - Counter: `pattern_intent_total{market,pattern,side}`
-  - Histogram: `pattern_to_intent_latency_seconds` with buckets `[0.5,1,2,5,10,30,60]`
-  - Helpers: `inc_pattern_detected`, `inc_pattern_intent`, `observe_pattern_to_intent_latency`
-- Structured logs (src/paperbot/logs/decision_log.py)
-  - `log_pattern_event(event_type, market, symbol, pattern, rsi=None, side=None, ts=None, extra=None)`
-  - Emits JSON for Loki with keys: `event`, `market`, `symbol`, `pattern`, `rsi`, `side`, `ts`, `severity`, `component`, `schema_version`.
-- Strategy wiring points (src/paperbot/strategies/runner.py)
-  - `record_pattern_detected(...)` and `record_pattern_intent(...)` (no dependency on specific strategies)
-- Demo emitter (src/paperbot/main.py)
-  - ENV-gated: `ENABLE_PATTERN_OBS_DEMO=1`; interval `PATTERN_OBS_DEMO_SECONDS` (default 15)
-  - Emits BTC/USDT `pattern_detected` (bullish_engulfing, rsi=33) then `pattern_intent` (long) after ~0.5s
-- Grafana (config/grafana/provisioning/dashboards/paperbot.json)
-  - New row “Patterns”: detections rate, intents rate, latency P50/P95, Loki logs panels
-- Alert (config/grafana/provisioning/alerting/patterns-min-activity.yml)
-  - If `sum(increase(pattern_detected_total[30m])) == 0` for 45m → “No pattern detections (30m)”
-  - Datasource UID: `PBFA97CFB590B2093`
-- Docs
-  - ADR: `docs/decisions/ADR-0012-pattern-observability.md`
-  - Runbook: new section “Pattern Observability (Phase 2.5)”
-  - README: features bullet linking to ADR + Runbook
-  - .env example: `src/paperbot/.env.example`
-- Tooling
-  - Smoke script: `scripts/smoke_pattern_obs.sh`
+- Risk engine (`src/paperbot/risk/engine.py`)
+  - Tracks `DAILY_STOP` vs `KILL_SWITCH` flags and refreshes them on every
+    `approve` call.
+  - Emits a `DailyLossLimitBreach` event with equity, drop %, and flag snapshot
+    when equity falls beyond the configured daily cap.
+  - Blocks subsequent orders with `reason="daily_stop"` while the global kill
+    switch remains clear.
+- Halt flag registry (`src/paperbot/risk/halt_flags.py`)
+  - Lightweight module storing halt flags, with helpers for `set_flag`,
+    `snapshot`, `reset_flags`, and `any_active`.
+- Event schema (`src/paperbot/events/schema.py`)
+  - Adds the `DailyLossLimitBreach` payload to the shared event model.
 - Tests
-  - `tests/test_pattern_observability.py` covering counters/logs/histogram
+  - New `tests/test_daily_loss_limit.py` simulates a 5% drawdown, verifies the
+    breach event payload, and asserts only `DAILY_STOP` is true.
+  - Existing risk engine tests reset the halt registry and expect the
+    `daily_stop` reason after losses.
 
 ## How to Run
-- Compose (Prometheus+Grafana):
-  - `ENABLE_PATTERN_OBS_DEMO=1 PATTERN_OBS_DEMO_SECONDS=10 docker compose up`
-- Validate metrics:
-  - `curl -s http://localhost:8000/metrics | egrep 'pattern_detected_total|pattern_intent_total|pattern_to_intent_latency_seconds_bucket'`
-- Grafana → Paperbot Overview → Patterns row
-  - P50: `histogram_quantile(0.5, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))`
-  - P95: `histogram_quantile(0.95, sum by (le) (rate(pattern_to_intent_latency_seconds_bucket[5m])))`
-- Loki (optional overlay `-f docker-compose.loki.yml`):
-  - `{app="paperbot"} |= "pattern_detected"`
-  - `{app="paperbot"} |= "pattern_intent"`
-  - Note: If you prefer JSON filtering and your Loki supports it, use
-    `{app="paperbot"} | json | event == "pattern_detected"` (and `pattern_intent`).
+- Install deps: `poetry install --with dev`
+- Targeted tests: `poetry run python -m pytest tests/test_daily_loss_limit.py tests/test_risk_engine.py`
+- Full suite (optional): `poetry run python -m pytest`
+- During manual experiments, watch the Redis stream
+  (`paperbot.events`) or bot logs for `event_type="daily_loss_limit_breach"` and
+  confirm `paperbot_killswitch_active{market="crypto"}` remains `0` while
+  `DAILY_STOP` is true.
+
+## Observability Notes
+- Breach events are published through the existing event bus and can be tailed
+  alongside other risk notifications.
+- Metrics continue to use the Prometheus kill switch gauge; no new collectors
+  were introduced here.
 
 ## Compatibility
-- Additive; no changes to existing strategy/execution flows.
-- Metrics use safe getters; tolerant in constrained envs and tests.
+- Additive update; default behaviour stays untouched until equity drops below
+  the daily cap.
+- Global kill switch semantics remain unchanged and still report through
+  `paperbot_killswitch_active`.
 
 ## Checklist
-- [x] Metrics compile and export
-- [x] Logs JSON parse in Grafana Loki
-- [x] Panels present under “Patterns”
-- [x] Alert provisioned
-- [x] Smoke and unit tests present
+- [x] Daily stop logic blocks orders without toggling the global kill switch
+- [x] `DailyLossLimitBreach` event emitted with flag snapshot
+- [x] Targeted pytest coverage passes
+- [x] Docs/PR notes updated to describe the change set
 
 ## Links
-- ADR: `docs/decisions/ADR-0012-pattern-observability.md`
-- Runbook: `docs/RUNBOOK.md#pattern-observability-phase-25`
+- Risk engine: `src/paperbot/risk/engine.py`
+- Halt flags: `src/paperbot/risk/halt_flags.py`
+- Tests: `tests/test_daily_loss_limit.py`

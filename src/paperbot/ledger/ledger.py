@@ -28,23 +28,24 @@ class Ledger:
         pos = self._get_pos(f.symbol)
         # Determine if this increases or reduces position
         filled_qty = f.qty if f.qty >= 0 else -abs(f.qty)
+        fee_cost = getattr(f, "fee_usd", f.fee)
         if pos.qty == 0.0:
             # Opening
             pos.qty = filled_qty
             pos.avg_price = f.price
-            realized = -f.fee
+            realized = -fee_cost
         elif (pos.qty > 0 and filled_qty > 0) or (pos.qty < 0 and filled_qty < 0):
             # Adding to existing in same direction: new avg price
             new_qty = pos.qty + filled_qty
             if new_qty != 0:
                 pos.avg_price = (pos.avg_price * abs(pos.qty) + f.price * abs(filled_qty)) / abs(new_qty)
             pos.qty = new_qty
-            realized = -f.fee
+            realized = -fee_cost
         else:
             # Reducing / closing (opposite sign)
             reduce_qty = min(abs(pos.qty), abs(filled_qty))
             direction = 1.0 if pos.qty > 0 else -1.0
-            realized_pnl = (f.price - pos.avg_price) * (reduce_qty * direction) - f.fee
+            realized_pnl = (f.price - pos.avg_price) * (reduce_qty * direction) - fee_cost
             realized = realized_pnl
             pos.qty = pos.qty + filled_qty  # will reduce magnitude
             if pos.qty == 0:
@@ -54,7 +55,19 @@ class Ledger:
         # Counters cannot be decremented; only accumulate positive realized PnL
         if realized > 0:
             self._realized_counter.labels(f.symbol).inc(realized)
-        self.trades.append(Trade(ts=f.ts, symbol=f.symbol, side="buy" if f.qty>0 else "sell", qty=f.qty, price=f.price, fee=f.fee, realized_pnl=realized))
+        self.trades.append(
+            Trade(
+                ts=f.ts,
+                symbol=f.symbol,
+                side="buy" if f.qty > 0 else "sell",
+                qty=f.qty,
+                price=f.price,
+                fee=f.fee,
+                fee_currency=f.fee_currency,
+                fee_usd=fee_cost,
+                realized_pnl=realized,
+            )
+        )
 
     def mark_to_market(self, ts: int, price_by_symbol: Dict[str, float]) -> None:
         unreal_total = 0.0

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -84,6 +84,14 @@ class RiskBlocked(BaseEvent):
     reason: str
 
 
+class DailyLossLimitBreach(BaseEvent):
+    event_type: Literal["daily_loss_limit_breach"] = "daily_loss_limit_breach"
+    equity: float
+    equity_start: float
+    pct_drop: float
+    flags: Dict[str, bool] = Field(default_factory=dict)
+
+
 class DayHighlight(BaseEvent):
     event_type: Literal["day_highlight"] = "day_highlight"
     summary: str
@@ -104,7 +112,7 @@ AnyEvent = Union[
     OrderCanceled,
     OrderRejected,
     RiskBlocked,
+    DailyLossLimitBreach,
     DayHighlight,
     Heartbeat,
 ]
-

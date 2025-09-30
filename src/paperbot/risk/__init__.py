@@ -1,4 +1,5 @@
-"""Risk management components (placeholder).
+"""Risk management utilities and helpers."""
 
-Future modules will enforce exposure limits, drawdown caps, and kill switches.
-"""
+from .killswitch import check_killswitch, reset_killswitch, set_killswitch_state
+
+__all__ = ["check_killswitch", "reset_killswitch", "set_killswitch_state"]
