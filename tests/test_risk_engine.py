@@ -1,5 +1,11 @@
 from src.paperbot.risk.engine import RiskEngine
 from src.paperbot.risk.killswitch import reset_killswitch, check_killswitch
+from src.paperbot.risk.halt_flags import (
+    reset_flags as reset_halt_flags,
+    get_flag as get_halt_flag,
+    HALT_DAILY_STOP,
+    HALT_KILL_SWITCH,
+)
 from src.paperbot.strategies.base import Signal
 
 
@@ -9,6 +15,7 @@ def make_signal(symbol: str, ts: int, side: str, strategy: str = "mr"):
 
 def test_risk_sizing_and_caps():
     reset_killswitch()
+    reset_halt_flags()
     cfg = {"risk_frac": 0.0025, "atr_stop_mult": 1.5, "max_position_value_per_symbol": 0.2}
     r = RiskEngine(cfg, equity_start=10_000.0)
     sig = make_signal("BTC/USDT", 1, "long")
@@ -21,11 +28,14 @@ def test_risk_sizing_and_caps():
 
 def test_risk_killswitch_blocks():
     reset_killswitch()
+    reset_halt_flags()
     r = RiskEngine({"daily_loss_cap_pct": 0.02}, equity_start=10_000.0)
     # Trip killswitch by passing low equity
     r.on_realized_pnl(equity=9_700.0)
     assert r.is_active is True
-    assert check_killswitch("crypto") is True
+    assert get_halt_flag(HALT_DAILY_STOP) is True
+    assert get_halt_flag(HALT_KILL_SWITCH) is False
+    assert check_killswitch("crypto") is False
     sig = make_signal("BTC/USDT", 1, "long")
     features = {"price": 100.0, "atr14": 1.0, "timestamp": 1}
     assert r.approve(sig, features, equity=9_700.0) is None
@@ -33,6 +43,7 @@ def test_risk_killswitch_blocks():
 
 def test_risk_killswitch_blocks_followup_calls():
     reset_killswitch()
+    reset_halt_flags()
     r = RiskEngine({"daily_loss_cap_pct": 0.01}, equity_start=10_000.0)
     r.on_realized_pnl(equity=9_800.0)
     assert r.is_active
@@ -45,6 +56,7 @@ def test_risk_killswitch_blocks_followup_calls():
 
 def test_risk_killswitch_after_sequential_losses_blocks_orders():
     reset_killswitch()
+    reset_halt_flags()
     r = RiskEngine({"daily_loss_cap_pct": 0.02}, equity_start=10_000.0)
 
     # Losses that should not yet trigger the cap
@@ -54,7 +66,9 @@ def test_risk_killswitch_after_sequential_losses_blocks_orders():
     # Crossing the cap should activate the killswitch
     r.on_realized_pnl(equity=9_700.0)
     assert r.is_active is True
-    assert check_killswitch("crypto") is True
+    assert get_halt_flag(HALT_DAILY_STOP) is True
+    assert get_halt_flag(HALT_KILL_SWITCH) is False
+    assert check_killswitch("crypto") is False
 
     sig = make_signal("BTC/USDT", 123456, "long")
     features = {"price": 100.0, "atr14": 1.0, "timestamp": 123456}
